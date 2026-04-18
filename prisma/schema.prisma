@@ -1,0 +1,276 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mongodb"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+    id                   String    @id @default(auto()) @map("_id") @db.ObjectId
+    email                String    @unique
+    name                 String?
+    handle               String?   @unique
+    image                String?
+    googleId             String?   @unique
+    stripeCustomerId     String?
+    subscriptionStatus   String?
+    trialEndsAt          DateTime?
+    currentPeriodEnd     DateTime?
+    stripeSubscriptionId String?
+    createdAt            DateTime  @default(now())
+
+    stories              Story[]
+    characters           Character[]
+    locations            Location[]
+    referenceTerms       ReferenceTerm[]
+    referenceOccurrences ReferenceOccurrence[]
+}
+
+model Story {
+    id           String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId       String   @db.ObjectId
+    title        String   @default("Untitled")
+    penName      String?
+    wordCount    Int      @default(0)
+    lastEditedAt DateTime @default(now())
+    createdAt    DateTime @default(now())
+
+    user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+    blocks               Block[]
+    passages             Passage[]
+    characters           Character[]
+    locations            Location[]
+    referenceTerms       ReferenceTerm[]
+    referenceOccurrences ReferenceOccurrence[]
+    simulations          SimulationRun[]
+}
+
+model Block {
+    id          String   @id @default(auto()) @map("_id") @db.ObjectId
+    storyId     String   @db.ObjectId
+    passageId   String?  @db.ObjectId
+    type        String
+    content     String
+    contentJSON Json
+    order       Float
+    status      String   @default("pending")
+    hash        String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    story                Story                 @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    passage              Passage?              @relation(fields: [passageId], references: [id], onDelete: Cascade)
+    threads              Thread[]
+    referenceOccurrences ReferenceOccurrence[]
+
+    @@index([storyId, order])
+    @@index([passageId, order])
+}
+
+model Passage {
+    id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+    storyId             String   @db.ObjectId
+    title               String   @default("Untitled Passage")
+    order               Float
+    visible             Boolean  @default(true)
+    wordCount           Int      @default(0)
+    threadCount         Int      @default(0)
+    characterCount      Int      @default(0)
+    locationCount       Int      @default(0)
+    chapters            Json[]   @default([])
+    identifyingChapters String[] @default([])
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
+
+    story  Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    blocks Block[]
+    notes  PassageNote[]
+
+    @@index([storyId, order])
+    @@index([storyId, visible, order])
+}
+
+model PassageNote {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    passageId String   @db.ObjectId
+    content   String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    passage Passage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+
+    @@index([passageId, createdAt])
+}
+
+model ReferenceTerm {
+    id             String   @id @default(auto()) @map("_id") @db.ObjectId
+    storyId        String   @db.ObjectId
+    userId         String   @db.ObjectId
+    entityId       String   @db.ObjectId
+    entityType     String
+    text           String
+    normalizedText String
+    color          String?
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    story       Story                 @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+    occurrences ReferenceOccurrence[]
+
+    @@unique([storyId, entityId, entityType, normalizedText])
+    @@index([storyId, entityType, normalizedText])
+}
+
+model ReferenceOccurrence {
+    id         String   @id @default(auto()) @map("_id") @db.ObjectId
+    storyId    String   @db.ObjectId
+    blockId    String   @db.ObjectId
+    userId     String   @db.ObjectId
+    termId     String   @db.ObjectId
+    entityId   String   @db.ObjectId
+    entityType String
+    text       String
+    color      String?
+    source     String   @default("inferred")
+    confidence Float    @default(0.5)
+    createdAt  DateTime @default(now())
+
+    story Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    block Block         @relation(fields: [blockId], references: [id], onDelete: Cascade)
+    user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    term  ReferenceTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+    @@unique([blockId, termId])
+    @@index([storyId, entityType, entityId])
+    @@index([blockId])
+}
+
+model Character {
+    id             String   @id @default(auto()) @map("_id") @db.ObjectId
+    storyId        String   @db.ObjectId
+    userId         String   @db.ObjectId
+    name           String
+    initials       String
+    color          String
+    seedPrompt     String   @default("")
+    weight         Int      @default(5)
+    superObjective String   @default("")
+    coreFear       String   @default("")
+    customTags     Json[]   @default([])
+    mentionCount   Int      @default(0)
+    aliases        Json[]   @default([])
+    createdAt      DateTime @default(now())
+
+    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Location {
+    id           String   @id @default(auto()) @map("_id") @db.ObjectId
+    storyId      String   @db.ObjectId
+    userId       String   @db.ObjectId
+    name         String
+    color        String   @default("teal")
+    description  String   @default("")
+    mentionCount Int      @default(0)
+    createdAt    DateTime @default(now())
+
+    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Thread {
+    id            String   @id @default(auto()) @map("_id") @db.ObjectId
+    blockId       String   @db.ObjectId
+    storyId       String   @db.ObjectId
+    entityId      String   @db.ObjectId
+    entityType    String
+    blockOrder    Float
+    observation   String
+    interactions  String[]
+    emotionalTone String?
+    superObjAlign String?
+    createdAt     DateTime @default(now())
+
+    block Block @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+    @@unique([blockId, entityId])
+    @@index([storyId, entityId, blockOrder])
+    @@index([blockId])
+}
+
+model SimulationRun {
+    id               String   @id @default(auto()) @map("_id") @db.ObjectId
+    storyId          String   @db.ObjectId
+    userId           String   @db.ObjectId
+    highlightBlockId String?  @db.ObjectId
+    question         String?
+    focalEntityId    String?  @db.ObjectId
+    blockRangeIds    String[]
+    sensoryPresent   Json
+    candidates       Json[]
+    surfaced         String[]
+    userAction       String?
+    promotedTier     String?
+    createdAt        DateTime @default(now())
+
+    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+}
+
+model Waitlist {
+    id                         String    @id @default(auto()) @map("_id") @db.ObjectId
+    email                      String    @unique
+    referralCode               String    @unique
+    referredById               String?   @db.ObjectId
+    referralsCount             Int       @default(0)
+    confirmedAt                DateTime?
+    confirmationTokenHash      String?
+    confirmationTokenExpiresAt DateTime?
+    referralCreditedAt         DateTime?
+    createdAt                  DateTime  @default(now())
+
+    @@index([confirmedAt, referralsCount, createdAt])
+    @@index([referredById])
+}
+
+// Generic event log — metadata only, no prompt/response content.
+// userId and storyId are stored as plain strings (no Prisma relation) so
+// this table remains decoupled and events survive entity deletion.
+model AppEvent {
+    id String @id @default(auto()) @map("_id") @db.ObjectId
+
+    // Taxonomy
+    eventType  String // e.g. "ai.call.completed", "simulation.run.cache_hit"
+    eventGroup String // e.g. "ai", "simulation", "block_analysis"
+    source     String // service/worker name that emitted the event
+
+    // Outcome
+    status     String // "success" | "error" | "skipped"
+    occurredAt DateTime @default(now())
+    durationMs Int?
+
+    // Ownership (plain ObjectId strings — no cascade relation)
+    userId  String? @db.ObjectId
+    storyId String? @db.ObjectId
+
+    // Tracing
+    requestId String? // propagated from HTTP request-id header when available
+
+    // AI-specific usage (counts only — no tokens from prompt/response bodies)
+    provider         String? // "anthropic" | "openai"
+    model            String? // e.g. "gpt-4o-mini", "claude-sonnet-4-20250514"
+    inputUnits       Int? // input token count returned by provider SDK
+    outputUnits      Int? // output token count returned by provider SDK
+    estimatedCostUsd Float? // estimated USD cost based on published per-token pricing
+
+    // Event-type-specific payload (sanitized, no user content)
+    metadata Json
+
+    @@index([eventGroup, occurredAt])
+    @@index([eventType, occurredAt])
+    @@index([userId, occurredAt])
+    @@index([storyId, occurredAt])
+}
