@@ -1,15 +1,17 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { Logger } from 'nestjs-pino';
 import { AppConfigService } from './common/config/app-config.service';
 import { AppModule } from './app.module';
 import * as express from 'express';
 import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
-  const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
 
   const config = app.get(AppConfigService);
+  const logger = app.get(Logger);
 
   // Raw body for Stripe webhook signature verification — must be before global JSON parser
   app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
@@ -31,7 +33,7 @@ async function bootstrap() {
   });
 
   await app.listen(config.port);
-  logger.log(`Nest API listening on port ${config.port}`);
-  logger.log(`CORS origin set to ${config.nextJsOrigin}`);
+  logger.log(`Nest API listening on port ${config.port}`, 'Bootstrap');
+  logger.log(`CORS origin set to ${config.nextJsOrigin}`, 'Bootstrap');
 }
 bootstrap();

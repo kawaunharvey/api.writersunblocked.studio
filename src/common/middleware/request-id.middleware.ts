@@ -15,11 +15,12 @@ declare module 'express' {
  */
 @Injectable()
 export class RequestIdMiddleware implements NestMiddleware {
-  use(req: Request, _res: Response, next: NextFunction): void {
+  use(req: Request, res: Response, next: NextFunction): void {
     const existing = req.headers['x-request-id'];
     req.requestId = typeof existing === 'string' && existing.length > 0
       ? existing
       : randomUUID();
+    res.setHeader('x-request-id', req.requestId);
     next();
   }
 }
