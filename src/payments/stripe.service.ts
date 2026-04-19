@@ -37,14 +37,6 @@ export class StripeService {
     return customer.id;
   }
 
-  async createTrialSubscription(customerId: string): Promise<any> {
-    return this.stripe.subscriptions.create({
-      customer: customerId,
-      items: [{ price: this.config.stripePriceId }],
-      trial_period_days: 7,
-    });
-  }
-
   async createCheckoutSession(
     customerId: string,
     offer: CheckoutOfferPricing,

@@ -72,10 +72,6 @@ export class AppConfigService {
     return this.configService.get('STRIPE_WEBHOOK_SECRET', { infer: true });
   }
 
-  get stripePriceId(): string {
-    return this.configService.get('STRIPE_PRICE_ID', { infer: true });
-  }
-
   // Email
   get mailgunApiKey(): string {
     return this.configService.get('MAILGUN_API_KEY', { infer: true });

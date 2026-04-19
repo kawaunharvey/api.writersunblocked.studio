@@ -23,7 +23,6 @@ const envSchema = z.object({
   // Payments
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
-  STRIPE_PRICE_ID: z.string().min(1),
 
   // Email
   MAILGUN_API_KEY: z.string().min(1),
