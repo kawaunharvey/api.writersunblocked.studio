@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod'
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -13,6 +13,7 @@ const envSchema = z.object({
   GOOGLE_CALLBACK_URL: z.string().url(),
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRY: z.string().default('7d'),
+  AUTH_COOKIE_DOMAIN: z.string().optional(),
   INTERNAL_API_SECRET: z.string().min(1).default('change-me'),
 
   // AI

@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type { EnvVars } from './env.validation';
+import { Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import type { EnvVars } from './env.validation'
 
 @Injectable()
 export class AppConfigService {
@@ -57,6 +57,10 @@ export class AppConfigService {
 
   get jwtExpiry(): string {
     return this.configService.get('JWT_EXPIRY', { infer: true });
+  }
+
+  get authCookieDomain(): string | undefined {
+    return this.configService.get('AUTH_COOKIE_DOMAIN', { infer: true });
   }
 
   get internalApiSecret(): string {
