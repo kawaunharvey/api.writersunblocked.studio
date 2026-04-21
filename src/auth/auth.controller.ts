@@ -12,6 +12,9 @@ import { AppConfigService } from '../common/config/app-config.service'
 import { AuthService } from './auth.service'
 import { Public } from './public.decorator'
 
+type OAuthUser = { id: string; email: string; subscriptionStatus: string | null }
+type WaitlistRejectionUser = { waitlistRejection: string }
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -30,7 +33,13 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
       async googleCallback(@Req() req: any, @Res() res: any) {
-    const user = req.user as { id: string; email: string; subscriptionStatus: string | null };
+    const user = req.user as OAuthUser | WaitlistRejectionUser;
+    if ('waitlistRejection' in user) {
+      const redirectUrl = new URL(this.config.nextJsOrigin);
+      redirectUrl.searchParams.set('error', user.waitlistRejection);
+      return res.redirect(redirectUrl.toString());
+    }
+
     const token = this.authService.issueJwt(user);
     const isProduction = this.config.nodeEnv === 'production';
     const cookieDomain = this.getCookieDomain(isProduction);

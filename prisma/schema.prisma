@@ -227,6 +227,7 @@ model SimulationRun {
 model Waitlist {
     id                         String    @id @default(auto()) @map("_id") @db.ObjectId
     email                      String    @unique
+    approved                   Boolean   @default(false)
     referralCode               String    @unique
     referredById               String?   @db.ObjectId
     referralsCount             Int       @default(0)

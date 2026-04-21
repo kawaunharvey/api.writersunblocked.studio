@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../database/prisma.service';
-import { AppConfigService } from '../common/config/app-config.service';
-import type { JwtPayload } from './jwt.strategy';
+import { Injectable } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
+import { AppConfigService } from '../common/config/app-config.service'
+import { PrismaService } from '../database/prisma.service'
+import type { JwtPayload } from './jwt.strategy'
 
 interface GoogleUserData {
   googleId: string;
@@ -10,6 +10,15 @@ interface GoogleUserData {
   name: string | null;
   image: string | null;
 }
+
+export type WaitlistRejectionReason =
+  | 'not_on_waitlist'
+  | 'not_confirmed'
+  | 'pending_approval';
+
+export type WaitlistAccessResult =
+  | { ok: true }
+  | { ok: false; reason: WaitlistRejectionReason };
 
 @Injectable()
 export class AuthService {
@@ -44,6 +53,36 @@ export class AuthService {
         trialEndsAt,
       },
     });
+  }
+
+  async findUserByGoogleId(googleId: string) {
+    return this.prisma.user.findUnique({
+      where: { googleId },
+    });
+  }
+
+  async checkNewUserWaitlistAccess(email: string): Promise<WaitlistAccessResult> {
+    const waitlistEntry = await this.prisma.waitlist.findUnique({
+      where: { email: email.trim().toLowerCase() },
+      select: {
+        confirmedAt: true,
+        approved: true,
+      },
+    });
+
+    if (!waitlistEntry) {
+      return { ok: false, reason: 'not_on_waitlist' };
+    }
+
+    if (!waitlistEntry.confirmedAt) {
+      return { ok: false, reason: 'not_confirmed' };
+    }
+
+    if (!waitlistEntry.approved) {
+      return { ok: false, reason: 'pending_approval' };
+    }
+
+    return { ok: true };
   }
 
   issueJwt(user: { id: string; email: string; subscriptionStatus: string | null }): string {
