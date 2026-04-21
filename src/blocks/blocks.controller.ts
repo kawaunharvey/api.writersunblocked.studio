@@ -1,21 +1,20 @@
+import { InjectQueue } from '@nestjs/bullmq'
 import {
-  Controller,
-  Post,
-  Patch,
-  Delete,
-  Body,
-  Param,
-  Req,
-  HttpCode,
-  Inject,
-} from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
-import { BlocksService } from './blocks.service';
-import { CreateBlockDto, UpdateBlockDto } from './blocks.dto';
-import { BLOCK_ANALYSIS_QUEUE } from '../queues/queue.constants';
-import { EventsService } from '../events/events.service';
-import { EVENT_GROUP, EVENT_TYPE } from '../events/event.constants';
+    Body,
+    Controller,
+    Delete,
+    HttpCode,
+    Param,
+    Patch,
+    Post,
+    Req
+} from '@nestjs/common'
+import { Queue } from 'bullmq'
+import { EVENT_GROUP, EVENT_TYPE } from '../events/event.constants'
+import { EventsService } from '../events/events.service'
+import { BLOCK_ANALYSIS_QUEUE } from '../queues/queue.constants'
+import { CreateBlockDto, UpdateBlockDto } from './blocks.dto'
+import { BlocksService } from './blocks.service'
 
 @Controller()
 export class BlocksController {
@@ -69,6 +68,12 @@ export class BlocksController {
         metadata: { blockId: block.id },
       });
     }
-    return { queued: true, blockId: block.id };
+    return {
+      queued: Boolean(block.shouldQueue),
+      blockId: block.id,
+      skipped: Boolean((block as { skipped?: boolean }).skipped),
+      skipReason: (block as { skipReason?: string }).skipReason,
+      eligibleAt: (block as { eligibleAt?: Date }).eligibleAt,
+    };
   }
 }

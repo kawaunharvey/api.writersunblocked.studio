@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { createHash } from 'crypto';
-import { PrismaService } from '../database/prisma.service';
-import { PassagesService } from '../passages/passages.service';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { hashBlockContent } from '../blocks/block-content-hash'
+import { PrismaService } from '../database/prisma.service'
+import { PassagesService } from '../passages/passages.service'
 
 type StoryDocumentNode = Record<string, unknown>;
 type StoryDocument = { type?: unknown; content?: StoryDocumentNode[] };
@@ -52,10 +52,6 @@ export class StoriesService {
     }
 
     return candidate.confidence;
-  }
-
-  private sha256(text: string): string {
-    return createHash('sha256').update(text).digest('hex');
   }
 
   private normalizeReferenceText(value: string): string {
@@ -480,7 +476,7 @@ export class StoriesService {
           content,
           contentJSON,
           order: index + 1,
-          hash: this.sha256(content),
+          hash: hashBlockContent(content),
         };
       })
       .filter(
@@ -692,6 +688,8 @@ export class StoriesService {
               hash: true,
               status: true,
               passageId: true,
+              analysisSkipped: true,
+              lastAnalyzedAt: true,
             },
           });
 
@@ -715,6 +713,15 @@ export class StoriesService {
                   order: nextBlock.order,
                   hash: nextBlock.hash,
                   status: existingBlock.hash === nextBlock.hash ? existingBlock.status : 'pending',
+                  ...(existingBlock.hash === nextBlock.hash
+                    ? {}
+                    : {
+                        analyzedContentHash: null,
+                        analysisResult: null,
+                        lastAnalyzedAt: existingBlock.analysisSkipped ? null : existingBlock.lastAnalyzedAt,
+                        analysisSkipped: false,
+                        analysisFailCount: 0,
+                      }),
                 },
               });
               persistedBlocks.push({
@@ -734,6 +741,11 @@ export class StoriesService {
                 contentJSON: nextBlock.contentJSON as object,
                 order: nextBlock.order,
                 hash: nextBlock.hash,
+                analyzedContentHash: null,
+                analysisResult: null,
+                lastAnalyzedAt: null,
+                analysisSkipped: false,
+                analysisFailCount: 0,
                 status: 'pending',
               },
             });
@@ -819,6 +831,8 @@ export class StoriesService {
               id: true,
               hash: true,
               status: true,
+              analysisSkipped: true,
+              lastAnalyzedAt: true,
             },
           });
 
@@ -836,6 +850,15 @@ export class StoriesService {
                   order: nextBlock.order,
                   hash: nextBlock.hash,
                   status: existingBlock.hash === nextBlock.hash ? existingBlock.status : 'pending',
+                  ...(existingBlock.hash === nextBlock.hash
+                    ? {}
+                    : {
+                        analyzedContentHash: null,
+                        analysisResult: null,
+                        lastAnalyzedAt: existingBlock.analysisSkipped ? null : existingBlock.lastAnalyzedAt,
+                        analysisSkipped: false,
+                        analysisFailCount: 0,
+                      }),
                 },
               });
 
@@ -856,6 +879,11 @@ export class StoriesService {
                 contentJSON: nextBlock.contentJSON as object,
                 order: nextBlock.order,
                 hash: nextBlock.hash,
+                analyzedContentHash: null,
+                analysisResult: null,
+                lastAnalyzedAt: null,
+                analysisSkipped: false,
+                analysisFailCount: 0,
                 status: 'pending',
               },
             });

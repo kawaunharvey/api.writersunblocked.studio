@@ -1,12 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import Stripe from 'stripe';
-import { AppConfigService } from '../common/config/app-config.service';
-import { PrismaService } from '../database/prisma.service';
+import { Injectable, Logger } from '@nestjs/common'
+import Stripe from 'stripe'
+import { AppConfigService } from '../common/config/app-config.service'
+import { PrismaService } from '../database/prisma.service'
 
 export type RecurringInterval = 'day' | 'week' | 'month' | 'year';
 
 export interface CheckoutOfferPricing {
   id: string;
+  tier?: string;
   name: string;
   description: string;
   interval: RecurringInterval;
@@ -62,6 +63,16 @@ export class StripeService {
       customer: customerId,
       mode: 'subscription',
       line_items: [lineItem],
+      metadata: {
+        offerId: offer.id,
+        offerTier: offer.tier ?? 'free',
+      },
+      subscription_data: {
+        metadata: {
+          offerId: offer.id,
+          offerTier: offer.tier ?? 'free',
+        },
+      },
       success_url: successUrl,
       cancel_url: cancelUrl,
     });
@@ -89,6 +100,10 @@ export class StripeService {
       where: { id: user.id },
       data: {
         subscriptionStatus: subscription.status,
+        subscriptionOfferId:
+          typeof subscription.metadata?.offerId === 'string' && subscription.metadata.offerId.trim().length > 0
+            ? subscription.metadata.offerId.trim()
+            : null,
         stripeSubscriptionId: subscription.id,
         currentPeriodEnd: new Date((subscription as unknown as { current_period_end: number }).current_period_end * 1000),
       },
@@ -106,6 +121,7 @@ export class StripeService {
       where: { id: user.id },
       data: {
         subscriptionStatus: 'canceled',
+        subscriptionOfferId: null,
         stripeSubscriptionId: null,
         currentPeriodEnd: null,
       },

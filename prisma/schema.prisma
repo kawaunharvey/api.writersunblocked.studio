@@ -16,6 +16,7 @@ model User {
     googleId             String?   @unique
     stripeCustomerId     String?
     subscriptionStatus   String?
+    subscriptionOfferId  String?
     trialEndsAt          DateTime?
     currentPeriodEnd     DateTime?
     stripeSubscriptionId String?
@@ -48,17 +49,22 @@ model Story {
 }
 
 model Block {
-    id          String   @id @default(auto()) @map("_id") @db.ObjectId
-    storyId     String   @db.ObjectId
-    passageId   String?  @db.ObjectId
-    type        String
-    content     String
-    contentJSON Json
-    order       Float
-    status      String   @default("pending")
-    hash        String?
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @updatedAt
+    id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+    storyId             String    @db.ObjectId
+    passageId           String?   @db.ObjectId
+    type                String
+    content             String
+    contentJSON         Json
+    order               Float
+    status              String    @default("pending")
+    hash                String?
+    analyzedContentHash String?
+    analysisResult      Json?
+    lastAnalyzedAt      DateTime?
+    analysisSkipped     Boolean   @default(false)
+    analysisFailCount   Int       @default(0)
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
 
     story                Story                 @relation(fields: [storyId], references: [id], onDelete: Cascade)
     passage              Passage?              @relation(fields: [passageId], references: [id], onDelete: Cascade)
@@ -67,6 +73,7 @@ model Block {
 
     @@index([storyId, order])
     @@index([passageId, order])
+    @@index([storyId, analysisSkipped, lastAnalyzedAt])
 }
 
 model Passage {

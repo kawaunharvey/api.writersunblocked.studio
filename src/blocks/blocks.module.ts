@@ -1,11 +1,12 @@
-import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
-import { BlocksService } from './blocks.service';
-import { BlocksController } from './blocks.controller';
-import { DatabaseModule } from '../database/database.module';
-import { AppConfigModule } from '../common/config/config.module';
-import { BLOCK_ANALYSIS_QUEUE } from '../queues/queue.constants';
-import { PassagesModule } from '../passages/passages.module';
+import { BullModule } from '@nestjs/bullmq'
+import { Module } from '@nestjs/common'
+import { AppConfigModule } from '../common/config/config.module'
+import { DatabaseModule } from '../database/database.module'
+import { PassagesModule } from '../passages/passages.module'
+import { BLOCK_ANALYSIS_QUEUE } from '../queues/queue.constants'
+import { AnalysisEligibilityService } from './analysis-eligibility.service'
+import { BlocksController } from './blocks.controller'
+import { BlocksService } from './blocks.service'
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { PassagesModule } from '../passages/passages.module';
     BullModule.registerQueue({ name: BLOCK_ANALYSIS_QUEUE }),
   ],
   controllers: [BlocksController],
-  providers: [BlocksService],
+  providers: [BlocksService, AnalysisEligibilityService],
   exports: [BlocksService],
 })
 export class BlocksModule {}

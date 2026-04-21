@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { PassportStrategy } from '@nestjs/passport';
-import { Strategy, Profile } from 'passport-google-oauth20';
-import { AppConfigService } from '../common/config/app-config.service';
-import { AuthService, type WaitlistRejectionReason } from './auth.service';
+import { Injectable } from '@nestjs/common'
+import { PassportStrategy } from '@nestjs/passport'
+import { Profile, Strategy } from 'passport-google-oauth20'
+import { AppConfigService } from '../common/config/app-config.service'
+import { AuthService, type WaitlistRejectionReason } from './auth.service'
 
 const INTERNAL_EMAIL_DOMAIN = '@thehereafter.tech';
 
@@ -28,7 +28,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     _accessToken: string,
     _refreshToken: string,
     profile: Profile,
-  ): Promise<WaitlistRejectionUser | Awaited<ReturnType<AuthService['upsertGoogleUser'>>> {
+  ): Promise<WaitlistRejectionUser | Awaited<ReturnType<AuthService['upsertGoogleUser']>>> {
     const email = profile.emails?.[0]?.value;
     if (!email) {
       throw new Error('No email returned from Google OAuth');

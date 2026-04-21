@@ -43,6 +43,7 @@ export class UsersService {
     userId: string,
     data: {
       subscriptionStatus?: string;
+      subscriptionOfferId?: string | null;
       stripeCustomerId?: string;
       stripeSubscriptionId?: string;
       currentPeriodEnd?: Date;

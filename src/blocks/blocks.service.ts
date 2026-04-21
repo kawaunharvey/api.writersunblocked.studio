@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { createHash } from 'crypto';
-import Redis from 'ioredis';
-import { PrismaService } from '../database/prisma.service';
-import { AppConfigService } from '../common/config/app-config.service';
-import { PassagesService } from '../passages/passages.service';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import Redis from 'ioredis'
+import { AppConfigService } from '../common/config/app-config.service'
+import { PrismaService } from '../database/prisma.service'
+import { PassagesService } from '../passages/passages.service'
+import { AnalysisEligibilityService } from './analysis-eligibility.service'
+import { hashBlockContent } from './block-content-hash'
 
 @Injectable()
 export class BlocksService {
@@ -13,16 +14,13 @@ export class BlocksService {
     private readonly prisma: PrismaService,
     private readonly config: AppConfigService,
     private readonly passagesService: PassagesService,
+    private readonly analysisEligibility: AnalysisEligibilityService,
   ) {
     this.redis = new Redis(this.config.redisUrl, {
       lazyConnect: true,
       enableReadyCheck: false,
       maxRetriesPerRequest: 3,
     });
-  }
-
-  private sha256(text: string): string {
-    return createHash('sha256').update(text).digest('hex');
   }
 
   private async invalidateSimulationCache(storyId: string) {
@@ -79,9 +77,20 @@ export class BlocksService {
       }
     }
 
-    const hash = this.sha256(data.content);
+    const hash = hashBlockContent(data.content);
     const block = await this.prisma.block.create({
-      data: { storyId, ...data, contentJSON: data.contentJSON as object, hash, status: 'pending' },
+      data: {
+        storyId,
+        ...data,
+        contentJSON: data.contentJSON as object,
+        hash,
+        analyzedContentHash: null,
+        analysisResult: null,
+        lastAnalyzedAt: null,
+        analysisSkipped: false,
+        analysisFailCount: 0,
+        status: 'pending',
+      },
     });
 
     if (block.passageId) {
@@ -121,7 +130,7 @@ export class BlocksService {
       data.type !== undefined || data.order !== undefined || data.passageId !== undefined;
 
     if (data.content !== undefined) {
-      const newHash = this.sha256(data.content);
+      const newHash = hashBlockContent(data.content);
       if (newHash === block.hash && !hasNonContentChange && data.contentJSON === undefined) {
         // Content unchanged — skip re-analysis
         return { id: block.id, status: block.status, changed: false };
@@ -135,6 +144,15 @@ export class BlocksService {
           contentJSON: data.contentJSON as object | undefined,
           hash: newHash,
           status: nextStatus,
+          ...(newHash === block.hash
+            ? {}
+            : {
+                analyzedContentHash: null,
+                analysisResult: null,
+                lastAnalyzedAt: block.analysisSkipped ? null : block.lastAnalyzedAt,
+                analysisSkipped: false,
+                analysisFailCount: 0,
+              }),
         },
       });
 
@@ -185,11 +203,38 @@ export class BlocksService {
       return { ...block, shouldQueue: false };
     }
 
+    const eligibility = await this.analysisEligibility.evaluate(blockId, userId);
+    if (eligibility.decision === 'skip') {
+      const updated = await this.prisma.block.update({
+        where: { id: blockId },
+        data: {
+          status: 'analyzed',
+          analyzedContentHash: block.hash,
+          analysisSkipped: true,
+          analysisFailCount: 0,
+          lastAnalyzedAt: new Date(),
+        },
+      });
+
+      return { ...updated, shouldQueue: false, queued: false, skipped: true, skipReason: eligibility.reason };
+    }
+
+    if (eligibility.decision === 'hold') {
+      return {
+        ...block,
+        shouldQueue: false,
+        queued: false,
+        skipped: false,
+        holdReason: eligibility.reason,
+        eligibleAt: eligibility.eligibleAt,
+      };
+    }
+
     const updated = await this.prisma.block.update({
       where: { id: blockId },
       data: { status: 'queued' },
     });
 
-    return { ...updated, shouldQueue: true };
+    return { ...updated, shouldQueue: true, queued: true, skipped: false, tier: eligibility.tier };
   }
 }

@@ -10,12 +10,14 @@ import {
 import { IsNotEmpty, IsString, IsUrl } from 'class-validator'
 import { Public } from '../auth/public.decorator'
 import { PrismaService } from '../database/prisma.service'
-import { OFFERS } from './offers'
+import type { OfferTier } from './offers'
+import { getOfferById, OFFERS } from './offers'
 import type { RecurringInterval } from './stripe.service'
 import { StripeService } from './stripe.service'
 
 export interface Offer {
   id: string;
+  tier: OfferTier;
   priceId?: string;
   name: string;
   description: string;
@@ -86,7 +88,7 @@ export class PaymentsController {
 
     const normalizedOfferId = (dto.offerId ?? '').trim();
     const activeOffers = this.getActiveOffers();
-    const offer = activeOffers.find((item) => item.id === normalizedOfferId);
+    const offer = getOfferById(normalizedOfferId);
     if (!offer) {
       throw new BadRequestException({
         message: 'Invalid offerId',
