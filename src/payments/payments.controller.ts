@@ -1,19 +1,18 @@
 import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Post,
-  Req,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { IsNotEmpty, IsString, IsUrl } from 'class-validator';
-import { Public } from '../auth/public.decorator';
-import { StripeService } from './stripe.service';
-import type { RecurringInterval } from './stripe.service';
-import { PrismaService } from '../database/prisma.service';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+    BadRequestException,
+    Body,
+    Controller,
+    Get,
+    Post,
+    Req,
+    UnauthorizedException,
+} from '@nestjs/common'
+import { IsNotEmpty, IsString, IsUrl } from 'class-validator'
+import { Public } from '../auth/public.decorator'
+import { PrismaService } from '../database/prisma.service'
+import { OFFERS } from './offers'
+import type { RecurringInterval } from './stripe.service'
+import { StripeService } from './stripe.service'
 
 export interface Offer {
   id: string;
@@ -26,6 +25,8 @@ export interface Offer {
   interval: RecurringInterval;
   badge?: string;
   isActive: boolean;
+  includes?: string[];
+  maxBlocksAnalyzed?: number | 'unlimited';
 }
 
 export class CreateCheckoutSessionDto {
@@ -50,19 +51,7 @@ export class PaymentsController {
   ) {}
 
   private getActiveOffers(): Offer[] {
-    const candidatePaths = [
-      join(process.cwd(), 'src/payments/offers.json'),
-      join(process.cwd(), 'dist/payments/offers.json'),
-    ];
-
-    const offersPath = candidatePaths.find((path) => existsSync(path));
-    if (!offersPath) {
-      return [];
-    }
-
-    const raw = readFileSync(offersPath, 'utf8');
-    const parsed = JSON.parse(raw) as Offer[];
-    return parsed.filter((offer) => offer.isActive);
+    return OFFERS.filter((offer) => offer.isActive);
   }
 
   @Public()

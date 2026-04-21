@@ -37,7 +37,7 @@ export class StoriesController {
   @Post('stories')
       create(@Req() req: any, @Body() dto: CreateStoryDto) {
     const { userId } = req.user as { userId: string };
-    return this.storiesService.create(userId, dto.title);
+    return this.storiesService.create(userId, dto.title, dto.penName);
   }
 
   @Get('stories/:id')

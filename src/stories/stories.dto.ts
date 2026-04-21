@@ -4,12 +4,20 @@ export class CreateStoryDto {
   @IsOptional()
   @IsString()
   title?: string;
+
+  @IsOptional()
+  @IsString()
+  penName?: string;
 }
 
 export class UpdateStoryDto {
   @IsOptional()
   @IsString()
   title?: string;
+
+  @IsOptional()
+  @IsString()
+  penName?: string;
 
   @IsOptional()
   @IsString()

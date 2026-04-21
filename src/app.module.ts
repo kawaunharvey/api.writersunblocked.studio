@@ -73,6 +73,13 @@ type RequestWithIds = IncomingMessage & {
             statusCode: res.statusCode,
             errorMessage: err.message,
           }),
+          autoLogging: {
+            ignore: (req) => {
+              const url = (req as IncomingMessage & { url?: string }).url ?? '';
+              const silenced = ['/health', '/auth/google/callback'];
+              return silenced.some((path) => url.startsWith(path));
+            },
+          },
           redact: {
             paths: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie'],
             remove: true,

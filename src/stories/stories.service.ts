@@ -627,9 +627,9 @@ export class StoriesService {
     });
   }
 
-  async create(userId: string, title = 'Untitled') {
+  async create(userId: string, title = 'Untitled', penName?: string) {
     const story = await this.prisma.story.create({
-      data: { userId, title },
+      data: { userId, title, ...(penName !== undefined ? { penName } : {}) },
     });
 
     await this.prisma.passage.create({
@@ -656,7 +656,7 @@ export class StoriesService {
   async update(
     storyId: string,
     userId: string,
-    data: { title?: string; content?: string; contentJSON?: Record<string, unknown>; wordCount?: number },
+    data: { title?: string; penName?: string; content?: string; contentJSON?: Record<string, unknown>; wordCount?: number },
   ) {
     const story = await this.assertOwnership(storyId, userId);
     const hasBlockPayload = data.content !== undefined || data.contentJSON !== undefined;
@@ -674,6 +674,7 @@ export class StoriesService {
             where: { id: storyId },
             data: {
               ...(data.title !== undefined ? { title: data.title } : {}),
+              ...(data.penName !== undefined ? { penName: data.penName } : {}),
               ...(data.wordCount !== undefined ? { wordCount: data.wordCount } : {}),
               lastEditedAt: new Date(),
             },

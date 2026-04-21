@@ -84,9 +84,10 @@ model Passage {
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
-    story  Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
-    blocks Block[]
-    notes  PassageNote[]
+    story   Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    blocks  Block[]
+    threads Thread[]
+    notes   PassageNote[]
 
     @@index([storyId, order])
     @@index([storyId, visible, order])
@@ -186,6 +187,7 @@ model Thread {
     id            String   @id @default(auto()) @map("_id") @db.ObjectId
     blockId       String   @db.ObjectId
     storyId       String   @db.ObjectId
+    passageId     String?  @db.ObjectId
     entityId      String   @db.ObjectId
     entityType    String
     blockOrder    Float
@@ -195,11 +197,13 @@ model Thread {
     superObjAlign String?
     createdAt     DateTime @default(now())
 
-    block Block @relation(fields: [blockId], references: [id], onDelete: Cascade)
+    block   Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+    passage Passage? @relation(fields: [passageId], references: [id], onDelete: Cascade)
 
     @@unique([blockId, entityId])
     @@index([storyId, entityId, blockOrder])
     @@index([blockId])
+    @@index([passageId])
 }
 
 model SimulationRun {

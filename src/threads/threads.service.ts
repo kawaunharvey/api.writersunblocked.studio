@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../database/prisma.service';
+import { Injectable } from '@nestjs/common'
+import { PrismaService } from '../database/prisma.service'
 
 interface ThreadUpsertData {
   storyId: string;
+  passageId?: string | null;
   entityType: 'character' | 'location';
   blockOrder: number;
   observation: string;
@@ -20,6 +21,7 @@ export class ThreadsService {
       where: { blockId_entityId: { blockId, entityId } },
       create: { blockId, entityId, ...data },
       update: {
+        passageId: data.passageId,
         observation: data.observation,
         interactions: data.interactions ?? [],
         emotionalTone: data.emotionalTone,

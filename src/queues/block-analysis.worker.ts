@@ -1,14 +1,14 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
-import { Job } from 'bullmq';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../database/prisma.service';
-import { BlockAnalyzerService, ReferenceOccurrenceInput } from '../ai/block-analyzer.service';
-import { ThreadsService } from '../threads/threads.service';
-import { ProgressGateway } from '../gateway/progress.gateway';
-import { EventsService } from '../events/events.service';
-import { EVENT_GROUP, EVENT_TYPE } from '../events/event.constants';
-import { BLOCK_ANALYSIS_QUEUE } from './queue.constants';
+import { Processor, WorkerHost } from '@nestjs/bullmq'
+import { Logger } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
+import { Job } from 'bullmq'
+import { BlockAnalyzerService, ReferenceOccurrenceInput } from '../ai/block-analyzer.service'
+import { PrismaService } from '../database/prisma.service'
+import { EVENT_GROUP, EVENT_TYPE } from '../events/event.constants'
+import { EventsService } from '../events/events.service'
+import { ProgressGateway } from '../gateway/progress.gateway'
+import { ThreadsService } from '../threads/threads.service'
+import { BLOCK_ANALYSIS_QUEUE } from './queue.constants'
 
 interface BlockAnalysisJob {
   blockId: string;
@@ -173,6 +173,7 @@ export class BlockAnalysisWorker extends WorkerHost {
 
         await this.threadsService.upsert(blockId, extraction.entityId, {
           storyId,
+          passageId: block.passageId ?? null,
           entityType: extraction.entityType,
           blockOrder: block.order,
           observation: extraction.observation,
