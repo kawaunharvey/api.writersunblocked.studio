@@ -100,11 +100,12 @@ export class StoriesService {
     const pushReference = (
       type: 'character' | 'location',
       attrs: { id?: string; label?: string; color?: string } | undefined,
+      textFromContent?: string,
     ) => {
       const entityId = attrs?.id?.trim();
       if (!entityId) return;
 
-      const text = attrs?.label?.trim() || entityId;
+      const text = textFromContent?.trim() || attrs?.label?.trim() || entityId;
       results.push({
         entityId,
         entityType: type,
@@ -116,22 +117,40 @@ export class StoriesService {
     };
 
     const walk = (node: StoryDocumentNode) => {
+      const nodeText = typeof node.text === 'string' ? node.text : '';
+
       if (node.type === 'characterReference' || node.type === 'characterRef' || node.type === 'mention') {
-        pushReference('character', node.attrs as { id?: string; label?: string; color?: string } | undefined);
+        pushReference(
+          'character',
+          node.attrs as { id?: string; label?: string; color?: string } | undefined,
+          nodeText,
+        );
       }
 
       if (node.type === 'locationReference' || node.type === 'locationRef') {
-        pushReference('location', node.attrs as { id?: string; label?: string; color?: string } | undefined);
+        pushReference(
+          'location',
+          node.attrs as { id?: string; label?: string; color?: string } | undefined,
+          nodeText,
+        );
       }
 
       const marks = Array.isArray(node.marks) ? (node.marks as StoryDocumentNode[]) : [];
       marks.forEach((mark) => {
         if (mark.type === 'characterReference' || mark.type === 'characterRef' || mark.type === 'mention') {
-          pushReference('character', mark.attrs as { id?: string; label?: string; color?: string } | undefined);
+          pushReference(
+            'character',
+            mark.attrs as { id?: string; label?: string; color?: string } | undefined,
+            nodeText,
+          );
         }
 
         if (mark.type === 'locationReference' || mark.type === 'locationRef') {
-          pushReference('location', mark.attrs as { id?: string; label?: string; color?: string } | undefined);
+          pushReference(
+            'location',
+            mark.attrs as { id?: string; label?: string; color?: string } | undefined,
+            nodeText,
+          );
         }
       });
 
@@ -606,6 +625,7 @@ export class StoriesService {
       id: story.id,
       userId: story.userId,
       title: story.title,
+      onboardingComplete: story.onboardingComplete,
       wordCount: story.wordCount,
       lastEditedAt: story.lastEditedAt,
       createdAt: story.createdAt,
@@ -1081,6 +1101,54 @@ export class StoriesService {
         referenceOccurrences: summaries.reduce((sum, item) => sum + item.referenceOccurrences, 0),
       },
       summaries,
+    };
+  }
+
+  async refreshReferencesForStory(storyId: string, userId: string) {
+    await this.assertOwnership(storyId, userId);
+
+    const [blocks, passages] = await Promise.all([
+      this.prisma.block.findMany({
+        where: { storyId },
+        orderBy: { order: 'asc' },
+        select: {
+          id: true,
+          content: true,
+          contentJSON: true,
+        },
+      }),
+      this.prisma.passage.findMany({
+        where: { storyId },
+        select: { id: true },
+      }),
+    ]);
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.syncReferencesForBlocks(tx, {
+        storyId,
+        userId,
+        blocks: blocks.map((block) => ({
+          id: block.id,
+          content: block.content,
+          contentJSON:
+            block.contentJSON && typeof block.contentJSON === 'object'
+              ? (block.contentJSON as Record<string, unknown>)
+              : { type: 'doc', content: [] },
+        })),
+      });
+    }, { timeout: 20000, maxWait: 5000 });
+
+    await Promise.all(passages.map((passage) => this.passagesService.recomputeMetadata(passage.id)));
+
+    const [referenceTerms, referenceOccurrences] = await Promise.all([
+      this.prisma.referenceTerm.count({ where: { storyId } }),
+      this.prisma.referenceOccurrence.count({ where: { storyId } }),
+    ]);
+
+    return {
+      storyId,
+      referenceTerms,
+      referenceOccurrences,
     };
   }
 }

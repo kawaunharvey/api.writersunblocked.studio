@@ -1,15 +1,15 @@
-import { createHash } from 'node:crypto';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import Redis from 'ioredis';
-import { PrismaService } from '../database/prisma.service';
-import { AppConfigService } from '../common/config/app-config.service';
-import { SpConstructorService } from '../ai/sp-constructor.service';
-import { ProviderService } from '../ai/provider.service';
-import { ThreadsService } from '../threads/threads.service';
-import { MomentumService } from './momentum.service';
-import { EventsService } from '../events/events.service';
-import { EVENT_GROUP, EVENT_TYPE } from '../events/event.constants';
-import type { SurfacedDirection, CandidateDirection } from '../common/types/simulation.types';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import Redis from 'ioredis'
+import { createHash } from 'node:crypto'
+import { ProviderService } from '../ai/provider.service'
+import { SpConstructorService } from '../ai/sp-constructor.service'
+import { AppConfigService } from '../common/config/app-config.service'
+import type { CandidateDirection, SurfacedDirection } from '../common/types/simulation.types'
+import { PrismaService } from '../database/prisma.service'
+import { EVENT_GROUP, EVENT_TYPE } from '../events/event.constants'
+import { EventsService } from '../events/events.service'
+import { ThreadsService } from '../threads/threads.service'
+import { MomentumService } from './momentum.service'
 
 @Injectable()
 export class SimulationService {
@@ -20,6 +20,7 @@ export class SimulationService {
     storyId: string;
     highlightBlockId: string;
     question: string;
+    includeDreamThreads?: boolean;
   }): string {
     const normalizedQuestion = input.question.trim().replace(/\s+/g, ' ');
     const questionHash = createHash('sha256')
@@ -27,7 +28,8 @@ export class SimulationService {
       .digest('hex')
       .slice(0, 16);
 
-    return `simulate:${input.storyId}:${input.highlightBlockId}:${questionHash}`;
+    const dreamThreadsFlag = input.includeDreamThreads ? 'dt1' : 'dt0';
+    return `simulate:${input.storyId}:${input.highlightBlockId}:${questionHash}:${dreamThreadsFlag}`;
   }
 
   constructor(
@@ -51,6 +53,7 @@ export class SimulationService {
     userId: string;
     highlightBlockId: string;
     question: string;
+    includeDreamThreads?: boolean;
     blockWindowSize?: number;
   }): Promise<{
     simulationId: string;
@@ -194,11 +197,24 @@ export class SimulationService {
     );
 
     // Step 4b — AI generates 5 candidates via trajectory collision
+    const dreamThreads = input.includeDreamThreads
+      ? await this.prisma.dreamThread.findMany({
+          where: { storyId: input.storyId },
+          orderBy: { createdAt: 'desc' },
+        })
+      : [];
+
+    const dreamThreadContext = input.includeDreamThreads
+      ? `\n\n## World context (Dream Threads)\n${dreamThreads.map((dt) => `[${dt.type}] ${dt.body}`).join('\n')}`
+      : '';
+
+    const questionWithWorldContext = `${input.question}${dreamThreadContext}`.trim();
+
     const candidates = await this.generateCandidates(
       entityVectors,
       sensoryPresent,
       focalEntityThreads,
-      input.question,
+      questionWithWorldContext,
     );
 
     // Step 4c — PEC validation
@@ -233,6 +249,7 @@ export class SimulationService {
         sensoryPresent: sensoryPresent as unknown as object,
         candidates: candidates as unknown as object[],
         surfaced: top3.map((d) => d.id),
+        dreamThreadIds: dreamThreads.map((thread) => thread.id),
       },
     });
 

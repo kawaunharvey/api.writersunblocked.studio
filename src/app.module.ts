@@ -1,30 +1,34 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
-import { randomUUID } from 'crypto';
-import type { IncomingMessage } from 'http';
-import { LoggerModule } from 'nestjs-pino';
-import { AiModule } from './ai/ai.module';
-import { ApiModule } from './api/api.module';
-import { AuthModule } from './auth/auth.module';
-import { JwtAuthGuard } from './auth/jwt-auth.guard';
-import { AppConfigModule } from './common/config/config.module';
-import { AppConfigService } from './common/config/app-config.service';
-import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
-import { DatabaseModule } from './database/database.module';
-import { EmailModule } from './email/email.module';
-import { EntitiesModule } from './entities/entities.module';
-import { EventsModule } from './events/events.module';
-import { GatewayModule } from './gateway/gateway.module';
-import { PaymentsModule } from './payments/payments.module';
-import { QueuesModule } from './queues/queues.module';
-import { WorkerModule } from './queues/worker.module';
-import { SimulationModule } from './simulation/simulation.module';
-import { StoriesModule } from './stories/stories.module';
-import { BlocksModule } from './blocks/blocks.module';
-import { ThreadsModule } from './threads/threads.module';
-import { UsersModule } from './users/users.module';
-import { AppController } from './app.controller';
-import { PassagesModule } from './passages/passages.module';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
+import { APP_GUARD } from '@nestjs/core'
+import { randomUUID } from 'crypto'
+import type { IncomingMessage } from 'http'
+import { LoggerModule } from 'nestjs-pino'
+import { AiModule } from './ai/ai.module'
+import { ApiModule } from './api/api.module'
+import { AppController } from './app.controller'
+import { AuthModule } from './auth/auth.module'
+import { JwtAuthGuard } from './auth/jwt-auth.guard'
+import { BlocksModule } from './blocks/blocks.module'
+import { AppConfigService } from './common/config/app-config.service'
+import { AppConfigModule } from './common/config/config.module'
+import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
+import { DatabaseModule } from './database/database.module'
+import { DreamThreadsModule } from './dream-threads/dream-threads.module'
+import { EmailModule } from './email/email.module'
+import { EntitiesModule } from './entities/entities.module'
+import { EventsModule } from './events/events.module'
+import { GatewayModule } from './gateway/gateway.module'
+import { OnboardingModule } from './onboarding/onboarding.module'
+import { PassagesModule } from './passages/passages.module'
+import { PaymentsModule } from './payments/payments.module'
+import { QueuesModule } from './queues/queues.module'
+import { WorkerModule } from './queues/worker.module'
+import { SimulationModule } from './simulation/simulation.module'
+import { StoriesModule } from './stories/stories.module'
+import { StoryboardNotesModule } from './storyboard-notes/storyboard-notes.module'
+import { ThreadsModule } from './threads/threads.module'
+import { UsersModule } from './users/users.module'
+import { WorldCanonModule } from './world-canon/world-canon.module'
 
 type RequestWithIds = IncomingMessage & {
   id?: string | number;
@@ -107,6 +111,10 @@ type RequestWithIds = IncomingMessage & {
     UsersModule,
     StoriesModule,
     PassagesModule,
+    WorldCanonModule,
+    StoryboardNotesModule,
+    DreamThreadsModule,
+    OnboardingModule,
     BlocksModule,
     EntitiesModule,
     ThreadsModule,

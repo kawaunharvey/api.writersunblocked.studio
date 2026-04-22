@@ -1,11 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
-import { z } from 'zod';
-import { SimulationService } from '../simulation/simulation.service';
+import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common'
+import { z } from 'zod'
+import { SimulationService } from '../simulation/simulation.service'
 
 const simulateSchema = z.object({
   storyId: z.string().min(1),
   highlightBlockId: z.string().min(1),
   question: z.string().default(''),
+  includeDreamThreads: z.boolean().default(false),
   blockWindowSize: z.number().int().positive().optional(),
 });
 

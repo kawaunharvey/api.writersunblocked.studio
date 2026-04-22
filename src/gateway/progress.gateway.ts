@@ -1,12 +1,12 @@
-import { Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common'
 import {
-  ConnectedSocket,
-  MessageBody,
-  SubscribeMessage,
-  WebSocketGateway,
-  WebSocketServer,
-} from '@nestjs/websockets';
-import { Namespace, Socket } from 'socket.io';
+    ConnectedSocket,
+    MessageBody,
+    SubscribeMessage,
+    WebSocketGateway,
+    WebSocketServer,
+} from '@nestjs/websockets'
+import { Namespace, Socket } from 'socket.io'
 
 @WebSocketGateway({
   cors: {
@@ -102,6 +102,16 @@ export class ProgressGateway {
       threadsCreated,
       diagnostics,
     });
+  }
+
+  emitDreamThreadsUpdated(storyId: string): void {
+    this.logger.debug(`Emitting dreamthreads:updated for story=${storyId}`);
+    this.server.to(storyId).emit('dreamthreads:updated', { storyId });
+  }
+
+  emitOnboardingComplete(storyId: string): void {
+    this.logger.debug(`Emitting onboarding:complete for story=${storyId}`);
+    this.server.to(storyId).emit('onboarding:complete', { storyId });
   }
 
   @SubscribeMessage('join-story')

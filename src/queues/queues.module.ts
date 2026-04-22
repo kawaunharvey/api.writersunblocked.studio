@@ -1,8 +1,12 @@
-import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
-import { URL } from 'node:url';
-import { AppConfigService } from '../common/config/app-config.service';
-import { BLOCK_ANALYSIS_QUEUE } from './queue.constants';
+import { BullModule } from '@nestjs/bullmq'
+import { Module } from '@nestjs/common'
+import { URL } from 'node:url'
+import { AppConfigService } from '../common/config/app-config.service'
+import {
+    BLOCK_ANALYSIS_QUEUE,
+    DREAM_THREAD_GENERATE_QUEUE,
+    ONBOARDING_GENERATE_QUEUE,
+} from './queue.constants'
 
 export function redisConnectionFromUrl(redisUrl: string) {
   const parsed = new URL(redisUrl);
@@ -24,7 +28,11 @@ export function redisConnectionFromUrl(redisUrl: string) {
         connection: redisConnectionFromUrl(config.redisUrl),
       }),
     }),
-    BullModule.registerQueue({ name: BLOCK_ANALYSIS_QUEUE }),
+    BullModule.registerQueue(
+      { name: BLOCK_ANALYSIS_QUEUE },
+      { name: DREAM_THREAD_GENERATE_QUEUE },
+      { name: ONBOARDING_GENERATE_QUEUE },
+    ),
   ],
   exports: [BullModule],
 })

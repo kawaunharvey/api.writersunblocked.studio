@@ -30,19 +30,23 @@ model User {
 }
 
 model Story {
-    id           String   @id @default(auto()) @map("_id") @db.ObjectId
-    userId       String   @db.ObjectId
-    title        String   @default("Untitled")
-    penName      String?
-    wordCount    Int      @default(0)
-    lastEditedAt DateTime @default(now())
-    createdAt    DateTime @default(now())
+    id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId             String   @db.ObjectId
+    title              String   @default("Untitled")
+    penName            String?
+    onboardingComplete Boolean  @default(false)
+    wordCount          Int      @default(0)
+    lastEditedAt       DateTime @default(now())
+    createdAt          DateTime @default(now())
 
     user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
     blocks               Block[]
     passages             Passage[]
     characters           Character[]
     locations            Location[]
+    worldCanon           WorldCanon?
+    dreamThreads         DreamThread[]
+    storyboardNotes      StoryboardNote[]
     referenceTerms       ReferenceTerm[]
     referenceOccurrences ReferenceOccurrence[]
     simulations          SimulationRun[]
@@ -224,9 +228,45 @@ model SimulationRun {
     sensoryPresent   Json
     candidates       Json[]
     surfaced         String[]
+    dreamThreadIds   String[] @default([]) @db.ObjectId
     userAction       String?
     promotedTier     String?
     createdAt        DateTime @default(now())
+
+    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+}
+
+model WorldCanon {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    storyId   String   @unique @db.ObjectId
+    rules     Json
+    updatedAt DateTime @updatedAt
+    createdAt DateTime @default(now())
+
+    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+}
+
+model DreamThread {
+    id             String   @id @default(auto()) @map("_id") @db.ObjectId
+    storyId        String   @db.ObjectId
+    type           String
+    body           String
+    sourceEntities String[] @db.ObjectId
+    version        Int      @default(1)
+    createdAt      DateTime @default(now())
+
+    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+    @@index([storyId])
+}
+
+model StoryboardNote {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    storyId   String   @db.ObjectId
+    passageId String   @unique @db.ObjectId
+    body      String
+    updatedAt DateTime @updatedAt
+    createdAt DateTime @default(now())
 
     story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
 }
