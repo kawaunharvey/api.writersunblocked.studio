@@ -1,11 +1,11 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../database/prisma.service';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { PrismaService } from '../database/prisma.service'
 import {
-  CreatePassageDto,
-  CreatePassageNoteDto,
-  UpdatePassageDto,
-  UpdatePassageNoteDto,
-} from './passages.dto';
+    CreatePassageDto,
+    CreatePassageNoteDto,
+    UpdatePassageDto,
+    UpdatePassageNoteDto,
+} from './passages.dto'
 
 @Injectable()
 export class PassagesService {
@@ -110,7 +110,7 @@ export class PassagesService {
   async listForStory(storyId: string, userId: string) {
     await this.assertStoryOwnership(storyId, userId);
 
-    return this.prisma.passage.findMany({
+    const passages = await this.prisma.passage.findMany({
       where: { storyId },
       orderBy: { order: 'asc' },
       include: {
@@ -119,6 +119,67 @@ export class PassagesService {
         },
       },
     });
+
+    const passageIds = passages.map((p) => p.id);
+
+    const references = await this.prisma.referenceOccurrence.findMany({
+      where: {
+        block: { passageId: { in: passageIds } },
+      },
+      select: {
+        entityType: true,
+        entityId: true,
+        block: { select: { passageId: true } },
+      },
+    });
+
+    const passageCharacterIds = new Map<string, Set<string>>();
+    const passageLocationIds = new Map<string, Set<string>>();
+
+    for (const ref of references) {
+      const passageId = ref.block.passageId;
+      if (!passageId) continue;
+      if (ref.entityType === 'character') {
+        if (!passageCharacterIds.has(passageId)) passageCharacterIds.set(passageId, new Set());
+        passageCharacterIds.get(passageId)!.add(ref.entityId);
+      } else if (ref.entityType === 'location') {
+        if (!passageLocationIds.has(passageId)) passageLocationIds.set(passageId, new Set());
+        passageLocationIds.get(passageId)!.add(ref.entityId);
+      }
+    }
+
+    const allCharacterIds = new Set<string>();
+    const allLocationIds = new Set<string>();
+    for (const ids of passageCharacterIds.values()) ids.forEach((id) => allCharacterIds.add(id));
+    for (const ids of passageLocationIds.values()) ids.forEach((id) => allLocationIds.add(id));
+
+    const [characters, locations] = await Promise.all([
+      allCharacterIds.size > 0
+        ? this.prisma.character.findMany({
+            where: { id: { in: [...allCharacterIds] } },
+            select: { id: true, name: true, initials: true, color: true },
+          })
+        : [],
+      allLocationIds.size > 0
+        ? this.prisma.location.findMany({
+            where: { id: { in: [...allLocationIds] } },
+            select: { id: true, name: true, color: true },
+          })
+        : [],
+    ]);
+
+    const characterMap = new Map(characters.map((c) => [c.id, c]));
+    const locationMap = new Map(locations.map((l) => [l.id, l]));
+
+    return passages.map((passage) => ({
+      ...passage,
+      characters: [...(passageCharacterIds.get(passage.id) ?? [])]
+        .map((id) => characterMap.get(id))
+        .filter(Boolean),
+      locations: [...(passageLocationIds.get(passage.id) ?? [])]
+        .map((id) => locationMap.get(id))
+        .filter(Boolean),
+    }));
   }
 
   async create(storyId: string, userId: string, dto: CreatePassageDto) {
