@@ -30,3 +30,41 @@ export class StartOnboardingDto {
   @Type(() => OnboardingAnswersDto)
   answers!: OnboardingAnswersDto;
 }
+
+export class AnalyzePlannerDraftDto {
+  @IsString()
+  draft!: string;
+}
+
+export interface PlannerQuestionStatus {
+  question: string;
+  answered: boolean;
+  evidence?: string;
+}
+
+export interface PlannerExtractedCharacter {
+  name: string;
+  description: string;
+}
+
+export interface PlannerExtractedLocation {
+  name: string;
+  description: string;
+}
+
+export interface PlannerExtractedPlotline {
+  title: string;
+  note?: string;
+}
+
+export interface AnalyzePlannerDraftResponse {
+  wordCount: number;
+  thresholdWordCount: number;
+  thresholdReached: boolean;
+  answeredCount: number;
+  thresholdMet: boolean;
+  questions: PlannerQuestionStatus[];
+  extractedCharacters: PlannerExtractedCharacter[];
+  extractedLocations: PlannerExtractedLocation[];
+  extractedPlotlines: PlannerExtractedPlotline[];
+}
