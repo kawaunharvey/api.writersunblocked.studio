@@ -33,6 +33,7 @@ model Story {
     id                 String   @id @default(auto()) @map("_id") @db.ObjectId
     userId             String   @db.ObjectId
     title              String   @default("Untitled")
+    mode               String   @default("novel")
     penName            String?
     onboardingComplete Boolean  @default(false)
     wordCount          Int      @default(0)

@@ -1,25 +1,25 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Body,
-  Param,
-  Req,
-  HttpCode,
-  Headers,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { Public } from '../auth/public.decorator';
-import { AppConfigService } from '../common/config/app-config.service';
-import { StoriesService } from './stories.service';
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Headers,
+    HttpCode,
+    Param,
+    Patch,
+    Post,
+    Req,
+    UnauthorizedException,
+} from '@nestjs/common'
+import { Public } from '../auth/public.decorator'
+import { AppConfigService } from '../common/config/app-config.service'
 import {
-  CreateStoryDto,
-  RebuildReferencesDto,
-  UpdatePassageContentDto,
-  UpdateStoryDto,
-} from './stories.dto';
+    CreateStoryDto,
+    RebuildReferencesDto,
+    UpdatePassageContentDto,
+    UpdateStoryDto,
+} from './stories.dto'
+import { StoriesService } from './stories.service'
 
 @Controller()
 export class StoriesController {
@@ -37,7 +37,7 @@ export class StoriesController {
   @Post('stories')
       create(@Req() req: any, @Body() dto: CreateStoryDto) {
     const { userId } = req.user as { userId: string };
-    return this.storiesService.create(userId, dto.title, dto.penName);
+    return this.storiesService.create(userId, dto.title, dto.penName, dto.mode);
   }
 
   @Get('stories/:id')

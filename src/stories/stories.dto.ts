@@ -1,9 +1,16 @@
-import { IsObject, IsOptional, IsString, IsInt, Min } from 'class-validator';
+import { IsIn, IsInt, IsObject, IsOptional, IsString, Min } from 'class-validator'
+
+const STORY_MODES = ['novel', 'screenplay'] as const;
 
 export class CreateStoryDto {
   @IsOptional()
   @IsString()
   title?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(STORY_MODES)
+  mode?: (typeof STORY_MODES)[number];
 
   @IsOptional()
   @IsString()

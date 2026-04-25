@@ -16,13 +16,37 @@ interface ThreadUpsertData {
 export class ThreadsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private normalizeObservation(value: unknown): string {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
+    }
+
+    return 'Observation unavailable.';
+  }
+
   async upsert(blockId: string, entityId: string, data: ThreadUpsertData) {
+    const observation = this.normalizeObservation((data as { observation?: unknown }).observation);
+
     return this.prisma.thread.upsert({
       where: { blockId_entityId: { blockId, entityId } },
-      create: { blockId, entityId, ...data },
+      create: {
+        blockId,
+        entityId,
+        storyId: data.storyId,
+        passageId: data.passageId,
+        entityType: data.entityType,
+        blockOrder: data.blockOrder,
+        observation,
+        interactions: data.interactions ?? [],
+        emotionalTone: data.emotionalTone,
+        superObjAlign: data.superObjAlign,
+      },
       update: {
         passageId: data.passageId,
-        observation: data.observation,
+        observation,
         interactions: data.interactions ?? [],
         emotionalTone: data.emotionalTone,
         superObjAlign: data.superObjAlign,

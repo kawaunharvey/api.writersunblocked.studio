@@ -5,6 +5,9 @@ import { PassagesService } from '../passages/passages.service'
 
 type StoryDocumentNode = Record<string, unknown>;
 type StoryDocument = { type?: unknown; content?: StoryDocumentNode[] };
+type StoryMode = 'novel' | 'screenplay';
+
+const DEFAULT_STORY_MODE: StoryMode = 'novel';
 
 type ReferenceSource = 'explicit' | 'inferred';
 
@@ -248,6 +251,62 @@ export class StoriesService {
     return results;
   }
 
+  private extractScreenplaySpeakerCandidates(
+    contentJSON: Record<string, unknown>,
+    characters: CharacterReferenceEntity[],
+  ): ReferenceCandidate[] {
+    const doc = contentJSON as StoryDocument;
+    const nodes = Array.isArray(doc.content) ? doc.content : [];
+    if (nodes.length === 0) {
+      return [];
+    }
+
+    const characterLabelIndex = new Map<string, CharacterReferenceEntity>();
+    for (const character of characters) {
+      const aliases = this.extractAliasValues(Array.isArray(character.aliases) ? character.aliases : []);
+      const labels = [character.name, ...aliases]
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0);
+
+      for (const label of labels) {
+        characterLabelIndex.set(this.normalizeReferenceText(label), character);
+      }
+    }
+
+    const candidates: ReferenceCandidate[] = [];
+    for (const node of nodes) {
+      if (node.type !== 'characterCue') {
+        continue;
+      }
+
+      const cueText = this.extractNodeText(node).trim();
+      if (!cueText) {
+        continue;
+      }
+
+      const cleanedCueText = cueText.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+      if (!cleanedCueText) {
+        continue;
+      }
+
+      const matchedCharacter = characterLabelIndex.get(this.normalizeReferenceText(cleanedCueText));
+      if (!matchedCharacter) {
+        continue;
+      }
+
+      candidates.push({
+        entityId: matchedCharacter.id,
+        entityType: 'character',
+        text: cleanedCueText,
+        color: matchedCharacter.color,
+        source: 'inferred',
+        confidence: 0.94,
+      });
+    }
+
+    return candidates;
+  }
+
   private async syncReferencesForBlocks(
     tx: any,
     params: {
@@ -309,6 +368,10 @@ export class StoriesService {
     for (const block of params.blocks) {
       const references = [
         ...this.extractReferenceCandidates(block.contentJSON),
+        ...this.extractScreenplaySpeakerCandidates(
+          block.contentJSON,
+          characters as CharacterReferenceEntity[],
+        ),
         ...this.inferReferenceCandidatesFromText(block.content, {
           characters: characters as CharacterReferenceEntity[],
           locations: locations as LocationReferenceEntity[],
@@ -437,7 +500,106 @@ export class StoriesService {
       .join('\n\n');
   }
 
-  private splitStoryDocument(document: Record<string, unknown> | undefined, fallbackContent?: string) {
+  private resolveStoryMode(mode: unknown): StoryMode {
+    return mode === 'screenplay' ? 'screenplay' : DEFAULT_STORY_MODE;
+  }
+
+  private isNodeType(node: StoryDocumentNode, type: string): boolean {
+    return node.type === type;
+  }
+
+  private splitScreenplayNodes(nodes: StoryDocumentNode[]): StoryDocumentNode[][] {
+    const groups: StoryDocumentNode[][] = [];
+    let pendingTurn: StoryDocumentNode[] = [];
+
+    const flushPendingTurn = () => {
+      if (pendingTurn.length === 0) return;
+      groups.push([...pendingTurn]);
+      pendingTurn = [];
+    };
+
+    for (const node of nodes) {
+      if (this.isNodeType(node, 'sceneHeading')) {
+        flushPendingTurn();
+        groups.push([node]);
+        continue;
+      }
+
+      if (this.isNodeType(node, 'characterCue')) {
+        flushPendingTurn();
+        pendingTurn = [node];
+        continue;
+      }
+
+      if (this.isNodeType(node, 'parenthetical')) {
+        if (pendingTurn.length === 0) {
+          groups.push([node]);
+          continue;
+        }
+
+        pendingTurn.push(node);
+        continue;
+      }
+
+      if (this.isNodeType(node, 'dialogue')) {
+        if (pendingTurn.length === 0) {
+          groups.push([node]);
+          continue;
+        }
+
+        pendingTurn.push(node);
+        flushPendingTurn();
+        continue;
+      }
+
+      if (this.isNodeType(node, 'action') || this.isNodeType(node, 'transition')) {
+        if (pendingTurn.length > 0) {
+          pendingTurn.push(node);
+          flushPendingTurn();
+        } else {
+          groups.push([node]);
+        }
+        continue;
+      }
+
+      flushPendingTurn();
+      groups.push([node]);
+    }
+
+    flushPendingTurn();
+    return groups;
+  }
+
+  private inferBlockTypeForGroup(group: StoryDocumentNode[], mode: StoryMode): string {
+    const firstType = typeof group[0]?.type === 'string' ? group[0].type : '';
+    if (mode !== 'screenplay') {
+      return firstType === 'chapter' ? 'chapter' : 'scene';
+    }
+
+    if (firstType === 'sceneHeading') {
+      return 'screenplay_scene_heading';
+    }
+
+    if (firstType === 'characterCue' || firstType === 'parenthetical' || firstType === 'dialogue') {
+      return 'screenplay_turn';
+    }
+
+    if (firstType === 'action') {
+      return 'screenplay_action';
+    }
+
+    if (firstType === 'transition') {
+      return 'screenplay_transition';
+    }
+
+    return 'screenplay_misc';
+  }
+
+  private splitStoryDocument(
+    document: Record<string, unknown> | undefined,
+    fallbackContent?: string,
+    mode: StoryMode = DEFAULT_STORY_MODE,
+  ) {
     const normalizedDocument: StoryDocument =
       document && document.type === 'doc'
         ? (document as StoryDocument)
@@ -467,19 +629,13 @@ export class StoriesService {
       }>;
     }
 
-    const groups: StoryDocumentNode[][] = [];
-
-    // Keep chapter headings as their own block while preserving scene-level granularity
-    // for the prose that follows. This avoids collapsing an entire story into one block
-    // when a single chapter node exists.
-    for (const node of nodes) {
-      if (node.type === 'chapter') {
-        groups.push([node]);
-        continue;
-      }
-
-      groups.push([node]);
-    }
+    const groups: StoryDocumentNode[][] =
+      mode === 'screenplay'
+        ? this.splitScreenplayNodes(nodes)
+        : // Keep chapter headings as their own block while preserving scene-level granularity
+          // for the prose that follows. This avoids collapsing an entire story into one block
+          // when a single chapter node exists.
+          nodes.map((node) => [node]);
 
     return groups
       .map((group, index) => {
@@ -491,7 +647,7 @@ export class StoriesService {
         }
 
         return {
-          type: group[0]?.type === 'chapter' ? 'chapter' : 'scene',
+          type: this.inferBlockTypeForGroup(group, mode),
           content,
           contentJSON,
           order: index + 1,
@@ -625,6 +781,7 @@ export class StoriesService {
       id: story.id,
       userId: story.userId,
       title: story.title,
+      mode: this.resolveStoryMode((story as { mode?: unknown }).mode),
       onboardingComplete: story.onboardingComplete,
       wordCount: story.wordCount,
       lastEditedAt: story.lastEditedAt,
@@ -643,9 +800,14 @@ export class StoriesService {
     });
   }
 
-  async create(userId: string, title = 'Untitled', penName?: string) {
+  async create(userId: string, title = 'Untitled', penName?: string, mode?: StoryMode) {
     const story = await this.prisma.story.create({
-      data: { userId, title, ...(penName !== undefined ? { penName } : {}) },
+      data: {
+        userId,
+        title,
+        ...(penName !== undefined ? { penName } : {}),
+        mode: this.resolveStoryMode(mode),
+      },
     });
 
     await this.prisma.passage.create({
@@ -675,9 +837,10 @@ export class StoriesService {
     data: { title?: string; penName?: string; content?: string; contentJSON?: Record<string, unknown>; wordCount?: number },
   ) {
     const story = await this.assertOwnership(storyId, userId);
+    const storyMode = this.resolveStoryMode((story as { mode?: unknown }).mode);
     const hasBlockPayload = data.content !== undefined || data.contentJSON !== undefined;
     const nextBlocks = hasBlockPayload
-      ? this.splitStoryDocument(data.contentJSON, data.content)
+      ? this.splitStoryDocument(data.contentJSON, data.content, storyMode)
       : [];
 
     const maxAttempts = 3;
@@ -810,7 +973,8 @@ export class StoriesService {
     passageId: string,
     data: { content?: string; contentJSON?: Record<string, unknown>; wordCount?: number },
   ) {
-    await this.assertOwnership(storyId, userId);
+    const story = await this.assertOwnership(storyId, userId);
+    const storyMode = this.resolveStoryMode((story as { mode?: unknown }).mode);
 
     const passage = await this.prisma.passage.findUnique({
       where: { id: passageId },
@@ -823,7 +987,7 @@ export class StoriesService {
 
     const hasBlockPayload = data.content !== undefined || data.contentJSON !== undefined;
     const nextBlocks = hasBlockPayload
-      ? this.splitStoryDocument(data.contentJSON, data.content)
+      ? this.splitStoryDocument(data.contentJSON, data.content, storyMode)
       : [];
 
     const maxAttempts = 3;
