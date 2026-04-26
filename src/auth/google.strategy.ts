@@ -30,7 +30,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     _accessToken: string,
     _refreshToken: string,
     profile: Profile,
-  ): Promise<WaitlistRejectionUser | Awaited<ReturnType<AuthService['upsertGoogleUser']>>> {
+  ): Promise<WaitlistRejectionUser | { user: any; isNew: boolean }> {
     const email = profile.emails?.[0]?.value;
     if (!email) {
       throw new Error('No email returned from Google OAuth');
@@ -48,15 +48,14 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       }
     }
 
-    const referralCode = req.query?.referral || null;
+    const referralCode = req.cookies?.oauth_referral || null;
 
-    const user = await this.authService.upsertGoogleUser({
+    return this.authService.upsertGoogleUser({
       googleId: profile.id,
       email: normalizedEmail,
       name: profile.displayName ?? null,
       image: profile.photos?.[0]?.value ?? null,
       referralCode,
     });
-    return user;
   }
 }

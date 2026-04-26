@@ -20,7 +20,7 @@ model User {
     trialEndsAt             DateTime?
     currentPeriodEnd        DateTime?
     stripeSubscriptionId    String?
-    referredByWaitlistCode  String?
+    referredByReferralId    String?   @db.ObjectId
     notificationPreferences Json?
     createdAt               DateTime  @default(now())
 
@@ -29,6 +29,8 @@ model User {
     locations            Location[]
     referenceTerms       ReferenceTerm[]
     referenceOccurrences ReferenceOccurrence[]
+    referral             Referral?             @relation("UserOwnReferral")
+    referredByReferral   Referral?             @relation("UserReferredBy", fields: [referredByReferralId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model Story {
@@ -272,6 +274,18 @@ model StoryboardNote {
     createdAt DateTime @default(now())
 
     story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+}
+
+model Referral {
+    id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId             String   @unique @db.ObjectId
+    referralCode       String   @unique
+    referralsCount     Int      @default(0)
+    paidReferralsCount Int      @default(0)
+    createdAt          DateTime @default(now())
+
+    user          User   @relation("UserOwnReferral", fields: [userId], references: [id], onDelete: Cascade)
+    referredUsers User[] @relation("UserReferredBy")
 }
 
 model Waitlist {

@@ -54,37 +54,20 @@ export class UsersService {
   }
 
   async getReferralInfo(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        email: true,
-      },
+    const referral = await this.prisma.referral.findUnique({
+      where: { userId },
     });
 
-    if (!user) {
+    if (!referral) {
       return { isEligible: false, paidReferralsCount: 0, freeMonthsEarned: 0 };
     }
 
-    // Check if user has a confirmed waitlist entry (is eligible to be a referrer)
-    const waitlistEntry = await this.prisma.waitlist.findUnique({
-      where: { email: user.email.toLowerCase() },
-      select: {
-        referralCode: true,
-        confirmedAt: true,
-        paidReferralsCount: true,
-      },
-    });
-
-    if (!waitlistEntry || !waitlistEntry.confirmedAt) {
-      return { isEligible: false, paidReferralsCount: 0, freeMonthsEarned: 0 };
-    }
-
-    const paidReferralsCount = waitlistEntry.paidReferralsCount ?? 0;
+    const paidReferralsCount = referral.paidReferralsCount;
     const freeMonthsEarned = Math.floor(paidReferralsCount / 3);
 
     return {
       isEligible: true,
-      referralLink: `${process.env.NEXT_JS_ORIGIN || 'https://writersunblocked.studio'}/invite/${waitlistEntry.referralCode}`,
+      referralLink: `${process.env.NEXT_JS_ORIGIN || 'https://writersunblocked.studio'}/invite/${referral.referralCode}`,
       paidReferralsCount,
       freeMonthsEarned,
     };

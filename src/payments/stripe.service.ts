@@ -114,57 +114,55 @@ export class StripeService {
 
     // Handle referrer rewards: detect trialing → active transition
     const previousStatus = subscription.previous_attributes?.status;
-    if (previousStatus === 'trialing' && subscription.status === 'active' && user.referredByWaitlistCode) {
+    if (previousStatus === 'trialing' && subscription.status === 'active' && user.referredByReferralId) {
       await this.handleReferrerReward(user);
     }
   }
 
   private async handleReferrerReward(referredUser: any) {
     try {
-      const referralCode = referredUser.referredByWaitlistCode;
-
-      // Find the Waitlist entry
-      const waitlistEntry = await this.prisma.waitlist.findUnique({
-        where: { referralCode },
+      // Find the referrer's Referral record via the direct FK
+      const referral = await this.prisma.referral.findUnique({
+        where: { id: referredUser.referredByReferralId },
       });
 
-      if (!waitlistEntry) {
-        this.logger.warn(`Referral code ${referralCode} not found for reward`);
+      if (!referral) {
+        this.logger.warn(`Referral record ${referredUser.referredByReferralId} not found for reward`);
         return;
       }
 
       // Find the referrer User
       const referrerUser = await this.prisma.user.findUnique({
-        where: { email: waitlistEntry.email },
+        where: { id: referral.userId },
       });
 
       if (!referrerUser || !referrerUser.stripeCustomerId) {
-        this.logger.warn(`Referrer user not found or has no Stripe customer for referral code ${referralCode}`);
+        this.logger.warn(`Referrer user ${referral.userId} not found or has no Stripe customer`);
         return;
       }
 
-      // Increment paidReferralsCount on the Waitlist entry
-      const updatedWaitlistEntry = await this.prisma.waitlist.update({
-        where: { id: waitlistEntry.id },
+      // Increment paidReferralsCount on the Referral record
+      const updatedReferral = await this.prisma.referral.update({
+        where: { id: referral.id },
         data: { paidReferralsCount: { increment: 1 } },
       });
 
       this.logger.log(
-        `Incremented paid referrals for ${referralCode}: ${updatedWaitlistEntry.paidReferralsCount}`,
+        `Incremented paid referrals for referral ${referral.id}: ${updatedReferral.paidReferralsCount}`,
       );
 
       // Check if referrer should receive reward (every 3 paid conversions)
-      if (updatedWaitlistEntry.paidReferralsCount % 3 === 0) {
+      if (updatedReferral.paidReferralsCount % 3 === 0) {
         // Apply 1 month of Starter credit ($6) to referrer's Stripe account
         const creditAmountCents = 600; // $6 in cents
         await this.stripe.customers.createBalanceTransaction(referrerUser.stripeCustomerId, {
           amount: -creditAmountCents, // Negative = credit
           currency: 'usd',
-          description: `Referral reward: ${updatedWaitlistEntry.paidReferralsCount / 3} user(s) subscribed`,
+          description: `Referral reward: ${updatedReferral.paidReferralsCount / 3} user(s) subscribed`,
         });
 
         this.logger.log(
-          `Applied $6 credit to referrer ${referrerUser.id} (referral reward #${updatedWaitlistEntry.paidReferralsCount / 3})`,
+          `Applied $6 credit to referrer ${referrerUser.id} (referral reward #${updatedReferral.paidReferralsCount / 3})`,
         );
       }
     } catch (error) {

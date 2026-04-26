@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { AppConfigService } from '../common/config/app-config.service'
+import { generateReferralCode } from '../common/utils/referral-code.util'
 import { PrismaService } from '../database/prisma.service'
 import type { JwtPayload } from './jwt.strategy'
 
@@ -29,37 +30,58 @@ export class AuthService {
     private readonly config: AppConfigService,
   ) {}
 
-  async upsertGoogleUser(data: GoogleUserData) {
+  async upsertGoogleUser(data: GoogleUserData): Promise<{ user: any; isNew: boolean }> {
     const existing = await this.prisma.user.findUnique({
       where: { googleId: data.googleId },
+      include: { referral: true },
     });
 
     if (existing) {
-      return this.prisma.user.update({
+      // Lazily create a Referral record for existing users that don't have one yet
+      if (!existing.referral) {
+        await this.createReferralForUser(existing.id);
+      }
+
+      // Apply referral benefit to existing users — only once (no prior referral)
+      if (data.referralCode && !existing.referredByReferralId) {
+        const referralValidation = await this.validateAndApplyReferralCode(data.referralCode);
+        if (referralValidation.valid && referralValidation.referralId) {
+          const trialEndsAt = new Date();
+          trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+          await this.prisma.user.update({
+            where: { id: existing.id },
+            data: { referredByReferralId: referralValidation.referralId, trialEndsAt },
+          });
+          await this.prisma.referral.update({
+            where: { id: referralValidation.referralId },
+            data: { referralsCount: { increment: 1 } },
+          });
+        }
+      }
+
+      const user = await this.prisma.user.update({
         where: { id: existing.id },
         data: { name: data.name, image: data.image },
       });
+      return { user, isNew: false };
     }
 
     // Validate referral code and determine trial duration
     let trialDays = 7; // default
-    let referredByWaitlistCode: string | undefined;
+    let referredByReferralId: string | undefined;
 
     if (data.referralCode) {
-      const referralValidation = await this.validateAndApplyReferralCode(
-        data.referralCode,
-        data.email,
-      );
-      if (referralValidation.valid) {
+      const referralValidation = await this.validateAndApplyReferralCode(data.referralCode);
+      if (referralValidation.valid && referralValidation.referralId) {
         trialDays = 30;
-        referredByWaitlistCode = data.referralCode;
+        referredByReferralId = referralValidation.referralId;
       }
     }
 
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
-    return this.prisma.user.create({
+    const newUser = await this.prisma.user.create({
       data: {
         googleId: data.googleId,
         email: data.email,
@@ -67,32 +89,48 @@ export class AuthService {
         image: data.image,
         subscriptionStatus: 'trialing',
         trialEndsAt,
-        referredByWaitlistCode,
+        referredByReferralId,
       },
+    });
+
+    // Create Referral record; also increment referralsCount on the referrer
+    await this.createReferralForUser(newUser.id);
+
+    if (referredByReferralId) {
+      await this.prisma.referral.update({
+        where: { id: referredByReferralId },
+        data: { referralsCount: { increment: 1 } },
+      });
+    }
+
+    return { user: newUser, isNew: true };
+  }
+
+  private async createReferralForUser(userId: string): Promise<void> {
+    const code = await generateReferralCode(async (candidate) => {
+      const existing = await this.prisma.referral.findUnique({ where: { referralCode: candidate } });
+      return existing === null;
+    });
+    await this.prisma.referral.create({
+      data: { userId, referralCode: code },
     });
   }
 
   private async validateAndApplyReferralCode(
     referralCode: string,
-    userEmail: string,
-  ): Promise<{ valid: boolean }> {
+  ): Promise<{ valid: boolean; referralId?: string }> {
     try {
       const normalizedCode = referralCode.trim().toUpperCase();
 
-      const waitlistEntry = await this.prisma.waitlist.findUnique({
+      const referral = await this.prisma.referral.findUnique({
         where: { referralCode: normalizedCode },
       });
 
-      // Referral code must exist, be confirmed, and match the email
-      if (
-        !waitlistEntry ||
-        !waitlistEntry.confirmedAt ||
-        waitlistEntry.email.toLowerCase() !== userEmail.toLowerCase()
-      ) {
+      if (!referral) {
         return { valid: false };
       }
 
-      return { valid: true };
+      return { valid: true, referralId: referral.id };
     } catch {
       return { valid: false };
     }

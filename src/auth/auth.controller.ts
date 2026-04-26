@@ -12,7 +12,6 @@ import { AppConfigService } from '../common/config/app-config.service'
 import { AuthService } from './auth.service'
 import { Public } from './public.decorator'
 
-type OAuthUser = { id: string; email: string; subscriptionStatus: string | null }
 type WaitlistRejectionUser = { waitlistRejection: string }
 
 @Controller('auth')
@@ -33,16 +32,26 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
       async googleCallback(@Req() req: any, @Res() res: any) {
-    const user = req.user as OAuthUser | WaitlistRejectionUser;
+    const user = req.user as
+      | { user: { id: string; email: string; subscriptionStatus: string | null }; isNew: boolean }
+      | WaitlistRejectionUser;
+
     if ('waitlistRejection' in user) {
       const redirectUrl = new URL(this.config.nextJsOrigin);
       redirectUrl.searchParams.set('error', user.waitlistRejection);
       return res.redirect(redirectUrl.toString());
     }
 
-    const token = this.authService.issueJwt(user);
+    const { user: authUser, isNew } = user;
+    const mode: string | undefined = req.cookies?.oauth_mode;
+
+    const token = this.authService.issueJwt(authUser);
     const isProduction = this.config.nodeEnv === 'production';
     const cookieDomain = this.getCookieDomain(isProduction);
+
+    // Clear the short-lived OAuth cookies — they have done their job.
+    res.clearCookie('oauth_referral', { httpOnly: true, secure: isProduction, sameSite: 'lax' });
+    res.clearCookie('oauth_mode', { httpOnly: true, secure: isProduction, sameSite: 'lax' });
 
     if (cookieDomain) {
       // Clear legacy host-only cookie so only one jwt cookie remains.
@@ -60,6 +69,11 @@ export class AuthController {
       ...(cookieDomain ? { domain: cookieDomain } : {}),
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
+
+    // Soft-block path mismatch: existing user on signup path → inform them
+    if (mode === 'signup' && !isNew) {
+      return res.redirect(`${this.config.nextJsOrigin}/dashboard?notice=existing_account`);
+    }
 
     res.redirect(`${this.config.nextJsOrigin}/dashboard`);
   }

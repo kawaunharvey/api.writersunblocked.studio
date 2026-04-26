@@ -1,12 +1,12 @@
-import { BadRequestException, Body, ConflictException, Controller, Get, Param, Post } from '@nestjs/common'
+import { BadRequestException, Body, ConflictException, Controller, Get, Header, Param, Post } from '@nestjs/common'
 import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator'
 import { createHash, randomBytes } from 'crypto'
 import { Public } from '../auth/public.decorator'
 import { AppConfigService } from '../common/config/app-config.service'
+import { generateReferralCode } from '../common/utils/referral-code.util'
 import { PrismaService } from '../database/prisma.service'
 import { MailgunService } from '../email/mailgun.service'
 
-const REFERRAL_CODE_LENGTH = 8;
 const CONFIRMATION_TOKEN_BYTES = 32;
 const CONFIRMATION_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
@@ -41,27 +41,6 @@ export class WaitlistController {
     private readonly mailgun: MailgunService,
     private readonly config: AppConfigService,
   ) {}
-
-  private async createUniqueReferralCode(): Promise<string> {
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      const code = randomBytes(8)
-        .toString('base64')
-        .replace(/[^a-zA-Z0-9]/g, '')
-        .slice(0, REFERRAL_CODE_LENGTH)
-        .toUpperCase();
-
-      if (code.length !== REFERRAL_CODE_LENGTH) {
-        continue;
-      }
-
-      const existing = await this.prisma.waitlist.findUnique({ where: { referralCode: code } });
-      if (!existing) {
-        return code;
-      }
-    }
-
-    throw new ConflictException('Could not generate referral code. Please retry.');
-  }
 
   private buildConfirmationLink(rawToken: string): string {
     const url = new URL(this.config.waitlistConfirmUrl);
@@ -112,7 +91,10 @@ export class WaitlistController {
     const existing = await this.prisma.waitlist.findUnique({ where: { email } });
     if (existing) throw new ConflictException('Already on waitlist');
 
-    const referralCode = await this.createUniqueReferralCode();
+    const referralCode = await generateReferralCode(async (code) => {
+      const existing = await this.prisma.waitlist.findUnique({ where: { referralCode: code } });
+      return existing === null;
+    });
     const confirmationToken = randomBytes(CONFIRMATION_TOKEN_BYTES).toString('hex');
     const confirmationTokenHash = hashToken(confirmationToken);
     const confirmationTokenExpiresAt = new Date(Date.now() + CONFIRMATION_TOKEN_TTL_MS);
@@ -197,29 +179,22 @@ export class WaitlistController {
 
   @Public()
   @Get('validate/:code')
+  @Header('Cache-Control', 'no-store')
   async validateReferralCode(@Param('code') code: string) {
     const normalizedCode = code.trim().toUpperCase();
 
-    const waitlistEntry = await this.prisma.waitlist.findUnique({
+    const referral = await this.prisma.referral.findUnique({
       where: { referralCode: normalizedCode },
+      include: { user: { select: { name: true, email: true } } },
     });
 
-    if (!waitlistEntry || !waitlistEntry.confirmedAt) {
-      return { valid: false };
-    }
-
-    // Check if a User exists with matching email
-    const user = await this.prisma.user.findUnique({
-      where: { email: waitlistEntry.email },
-    });
-
-    if (!user) {
+    if (!referral) {
       return { valid: false };
     }
 
     return {
       valid: true,
-      referrerName: user.name || user.email.split('@')[0],
+      referrerName: referral.user.name || referral.user.email.split('@')[0],
       offer: {
         trialDays: 30,
         planId: 'early_bird',
