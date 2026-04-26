@@ -9,7 +9,7 @@ import { normalizeBlockContentForHash } from './block-content-hash'
 
 type EligibilityResult =
   | { decision: 'queue'; tier: OfferTier }
-  | { decision: 'skip'; tier: OfferTier; reason: 'minimum_content' | 'unchanged_content' | 'project_cap' | 'no_entity_match' }
+  | { decision: 'skip'; tier: OfferTier; reason: 'minimum_content' | 'unchanged_content' | 'project_cap' | 'no_entity_match' | 'paid-only' }
   | { decision: 'hold'; tier: OfferTier; reason: 'hold_period'; eligibleAt: Date };
 
 function escapeRegExp(value: string): string {
@@ -95,6 +95,11 @@ export class AnalysisEligibilityService {
     const tier = resolveTierFromSubscription(block.story.user);
     const policy = getTierPolicy(tier);
     const normalizedContent = normalizeBlockContentForHash(block.content);
+
+    // Paywall: auto-highlight is only available to active paid subscribers
+    if (block.story.user.subscriptionStatus !== 'active') {
+      return { decision: 'skip', tier, reason: 'paid-only' };
+    }
 
     if (normalizedContent.length < 40) {
       return { decision: 'skip', tier, reason: 'minimum_content' };

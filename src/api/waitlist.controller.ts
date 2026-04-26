@@ -1,10 +1,10 @@
-import { randomBytes, createHash } from 'crypto';
-import { BadRequestException, Body, ConflictException, Controller, Post } from '@nestjs/common';
-import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
-import { AppConfigService } from '../common/config/app-config.service';
-import { PrismaService } from '../database/prisma.service';
-import { MailgunService } from '../email/mailgun.service';
-import { Public } from '../auth/public.decorator';
+import { BadRequestException, Body, ConflictException, Controller, Get, Param, Post } from '@nestjs/common'
+import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator'
+import { createHash, randomBytes } from 'crypto'
+import { Public } from '../auth/public.decorator'
+import { AppConfigService } from '../common/config/app-config.service'
+import { PrismaService } from '../database/prisma.service'
+import { MailgunService } from '../email/mailgun.service'
 
 const REFERRAL_CODE_LENGTH = 8;
 const CONFIRMATION_TOKEN_BYTES = 32;
@@ -192,6 +192,39 @@ export class WaitlistController {
       referralsCount: latest.referralsCount,
       referralCode: latest.referralCode,
       referralLink: `${this.config.nextJsOrigin}/waitlist?ref=${latest.referralCode}`,
+    };
+  }
+
+  @Public()
+  @Get('validate/:code')
+  async validateReferralCode(@Param('code') code: string) {
+    const normalizedCode = code.trim().toUpperCase();
+
+    const waitlistEntry = await this.prisma.waitlist.findUnique({
+      where: { referralCode: normalizedCode },
+    });
+
+    if (!waitlistEntry || !waitlistEntry.confirmedAt) {
+      return { valid: false };
+    }
+
+    // Check if a User exists with matching email
+    const user = await this.prisma.user.findUnique({
+      where: { email: waitlistEntry.email },
+    });
+
+    if (!user) {
+      return { valid: false };
+    }
+
+    return {
+      valid: true,
+      referrerName: user.name || user.email.split('@')[0],
+      offer: {
+        trialDays: 30,
+        planId: 'early_bird',
+        price: '$6/mo',
+      },
     };
   }
 }

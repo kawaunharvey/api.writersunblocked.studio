@@ -52,4 +52,98 @@ export class UsersService {
   ) {
     return this.prisma.user.update({ where: { id: userId }, data });
   }
+
+  async getReferralInfo(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+      },
+    });
+
+    if (!user) {
+      return { isEligible: false, paidReferralsCount: 0, freeMonthsEarned: 0 };
+    }
+
+    // Check if user has a confirmed waitlist entry (is eligible to be a referrer)
+    const waitlistEntry = await this.prisma.waitlist.findUnique({
+      where: { email: user.email.toLowerCase() },
+      select: {
+        referralCode: true,
+        confirmedAt: true,
+        paidReferralsCount: true,
+      },
+    });
+
+    if (!waitlistEntry || !waitlistEntry.confirmedAt) {
+      return { isEligible: false, paidReferralsCount: 0, freeMonthsEarned: 0 };
+    }
+
+    const paidReferralsCount = waitlistEntry.paidReferralsCount ?? 0;
+    const freeMonthsEarned = Math.floor(paidReferralsCount / 3);
+
+    return {
+      isEligible: true,
+      referralLink: `${process.env.NEXT_JS_ORIGIN || 'https://writersunblocked.studio'}/invite/${waitlistEntry.referralCode}`,
+      paidReferralsCount,
+      freeMonthsEarned,
+    };
+  }
+
+  async updateNotifications(userId: string, preferences: Record<string, any>) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        notificationPreferences: preferences,
+      },
+    });
+  }
+
+  async softDeleteUser(userId: string) {
+    // Soft delete: anonymize PII and cancel Stripe subscription
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { stripeCustomerId: true },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Cancel Stripe subscription if active
+    if (user.stripeCustomerId) {
+      try {
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY, {
+          apiVersion: '2026-03-25.dahlia',
+        });
+
+        // Find and cancel the subscription
+        const subscriptions = await stripe.subscriptions.list({
+          customer: user.stripeCustomerId,
+          status: 'active',
+          limit: 1,
+        });
+
+        if (subscriptions.data.length > 0) {
+          await stripe.subscriptions.cancel(subscriptions.data[0].id);
+        }
+      } catch (error) {
+        // Log error but continue with deletion
+        console.error('Error canceling Stripe subscription:', error);
+      }
+    }
+
+    // Soft delete by anonymizing user
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        email: `deleted-${userId}@deleted.local`,
+        name: 'Deleted User',
+        handle: null,
+        googleId: null,
+        subscriptionStatus: 'canceled',
+        notificationPreferences: null,
+      },
+    });
+  }
 }

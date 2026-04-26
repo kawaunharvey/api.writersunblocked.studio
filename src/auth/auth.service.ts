@@ -9,6 +9,7 @@ interface GoogleUserData {
   email: string;
   name: string | null;
   image: string | null;
+  referralCode?: string | null;
 }
 
 export type WaitlistRejectionReason =
@@ -40,8 +41,23 @@ export class AuthService {
       });
     }
 
+    // Validate referral code and determine trial duration
+    let trialDays = 7; // default
+    let referredByWaitlistCode: string | undefined;
+
+    if (data.referralCode) {
+      const referralValidation = await this.validateAndApplyReferralCode(
+        data.referralCode,
+        data.email,
+      );
+      if (referralValidation.valid) {
+        trialDays = 30;
+        referredByWaitlistCode = data.referralCode;
+      }
+    }
+
     const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+    trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
     return this.prisma.user.create({
       data: {
@@ -51,8 +67,35 @@ export class AuthService {
         image: data.image,
         subscriptionStatus: 'trialing',
         trialEndsAt,
+        referredByWaitlistCode,
       },
     });
+  }
+
+  private async validateAndApplyReferralCode(
+    referralCode: string,
+    userEmail: string,
+  ): Promise<{ valid: boolean }> {
+    try {
+      const normalizedCode = referralCode.trim().toUpperCase();
+
+      const waitlistEntry = await this.prisma.waitlist.findUnique({
+        where: { referralCode: normalizedCode },
+      });
+
+      // Referral code must exist, be confirmed, and match the email
+      if (
+        !waitlistEntry ||
+        !waitlistEntry.confirmedAt ||
+        waitlistEntry.email.toLowerCase() !== userEmail.toLowerCase()
+      ) {
+        return { valid: false };
+      }
+
+      return { valid: true };
+    } catch {
+      return { valid: false };
+    }
   }
 
   async findUserByGoogleId(googleId: string) {

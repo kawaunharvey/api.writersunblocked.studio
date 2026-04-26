@@ -21,10 +21,12 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       clientSecret: config.googleClientSecret,
       callbackURL: config.googleCallbackUrl,
       scope: ['email', 'profile'],
+      passReqToCallback: true,
     });
   }
 
   async validate(
+    req: any,
     _accessToken: string,
     _refreshToken: string,
     profile: Profile,
@@ -46,11 +48,14 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       }
     }
 
+    const referralCode = req.query?.referral || null;
+
     const user = await this.authService.upsertGoogleUser({
       googleId: profile.id,
       email: normalizedEmail,
       name: profile.displayName ?? null,
       image: profile.photos?.[0]?.value ?? null,
+      referralCode,
     });
     return user;
   }

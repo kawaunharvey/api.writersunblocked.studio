@@ -96,6 +96,7 @@ export class StripeService {
       this.logger.warn(`No user found for Stripe customer ${customerId}`);
       return;
     }
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
@@ -108,7 +109,67 @@ export class StripeService {
         currentPeriodEnd: new Date((subscription as unknown as { current_period_end: number }).current_period_end * 1000),
       },
     });
+
     this.logger.log(`Subscription updated for user ${user.id}: ${subscription.status}`);
+
+    // Handle referrer rewards: detect trialing → active transition
+    const previousStatus = subscription.previous_attributes?.status;
+    if (previousStatus === 'trialing' && subscription.status === 'active' && user.referredByWaitlistCode) {
+      await this.handleReferrerReward(user);
+    }
+  }
+
+  private async handleReferrerReward(referredUser: any) {
+    try {
+      const referralCode = referredUser.referredByWaitlistCode;
+
+      // Find the Waitlist entry
+      const waitlistEntry = await this.prisma.waitlist.findUnique({
+        where: { referralCode },
+      });
+
+      if (!waitlistEntry) {
+        this.logger.warn(`Referral code ${referralCode} not found for reward`);
+        return;
+      }
+
+      // Find the referrer User
+      const referrerUser = await this.prisma.user.findUnique({
+        where: { email: waitlistEntry.email },
+      });
+
+      if (!referrerUser || !referrerUser.stripeCustomerId) {
+        this.logger.warn(`Referrer user not found or has no Stripe customer for referral code ${referralCode}`);
+        return;
+      }
+
+      // Increment paidReferralsCount on the Waitlist entry
+      const updatedWaitlistEntry = await this.prisma.waitlist.update({
+        where: { id: waitlistEntry.id },
+        data: { paidReferralsCount: { increment: 1 } },
+      });
+
+      this.logger.log(
+        `Incremented paid referrals for ${referralCode}: ${updatedWaitlistEntry.paidReferralsCount}`,
+      );
+
+      // Check if referrer should receive reward (every 3 paid conversions)
+      if (updatedWaitlistEntry.paidReferralsCount % 3 === 0) {
+        // Apply 1 month of Starter credit ($6) to referrer's Stripe account
+        const creditAmountCents = 600; // $6 in cents
+        await this.stripe.customers.createBalanceTransaction(referrerUser.stripeCustomerId, {
+          amount: -creditAmountCents, // Negative = credit
+          currency: 'usd',
+          description: `Referral reward: ${updatedWaitlistEntry.paidReferralsCount / 3} user(s) subscribed`,
+        });
+
+        this.logger.log(
+          `Applied $6 credit to referrer ${referrerUser.id} (referral reward #${updatedWaitlistEntry.paidReferralsCount / 3})`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(`Error handling referrer reward: ${error}`, error);
+    }
   }
 
   async handleSubscriptionDeleted(subscription: any) {

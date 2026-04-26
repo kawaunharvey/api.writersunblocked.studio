@@ -26,7 +26,7 @@ export class AuthController {
   @Get('google')
   @UseGuards(AuthGuard('google'))
   googleAuth() {
-    // Passport redirects to Google — no body needed
+    // Passport redirects to Google — referral code captured in GoogleStrategy
   }
 
   @Public()

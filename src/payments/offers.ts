@@ -88,7 +88,7 @@ const STARTER_MONTHLY: OfferConfig = {
     initialHoldPeriod: 48,
     scanCadence: CronExpression.EVERY_3_HOURS,
     processingMethod: 'batch',
-    autoAnalyze: false,
+    autoAnalyze: 'weekly',
     blockRecoveryOn: 'next-scan',
     maxSimulations: 10,
     cacheTTL: '10m'

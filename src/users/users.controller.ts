@@ -3,9 +3,10 @@ import {
     Body,
     ConflictException,
     Controller,
+    Delete,
     Get,
     Patch,
-    Req,
+    Req
 } from '@nestjs/common'
 import { IsString, Matches, MaxLength, MinLength } from 'class-validator'
 import { UsersService, isValidHandle, normalizeHandle } from './users.service'
@@ -23,6 +24,11 @@ class UpdateMeDto {
   @MinLength(2)
   @MaxLength(80)
   name: string;
+}
+
+class UpdateNotificationsDto {
+  // Allow any boolean fields for notification preferences
+  [key: string]: any;
 }
 
 @Controller('users')
@@ -62,5 +68,23 @@ export class UsersController {
     }
 
     return this.usersService.updateName(userId, name);
+  }
+
+  @Get('me/referral')
+  async getReferralInfo(@Req() req: any) {
+    const { userId } = req.user as { userId: string };
+    return this.usersService.getReferralInfo(userId);
+  }
+
+  @Patch('me/notifications')
+  async updateNotifications(@Req() req: any, @Body() dto: UpdateNotificationsDto) {
+    const { userId } = req.user as { userId: string };
+    return this.usersService.updateNotifications(userId, dto);
+  }
+
+  @Delete('me')
+  async deleteAccount(@Req() req: any) {
+    const { userId } = req.user as { userId: string };
+    return this.usersService.softDeleteUser(userId);
   }
 }

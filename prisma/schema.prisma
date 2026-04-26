@@ -8,19 +8,21 @@ datasource db {
 }
 
 model User {
-    id                   String    @id @default(auto()) @map("_id") @db.ObjectId
-    email                String    @unique
-    name                 String?
-    handle               String?   @unique
-    image                String?
-    googleId             String?   @unique
-    stripeCustomerId     String?
-    subscriptionStatus   String?
-    subscriptionOfferId  String?
-    trialEndsAt          DateTime?
-    currentPeriodEnd     DateTime?
-    stripeSubscriptionId String?
-    createdAt            DateTime  @default(now())
+    id                      String    @id @default(auto()) @map("_id") @db.ObjectId
+    email                   String    @unique
+    name                    String?
+    handle                  String?   @unique
+    image                   String?
+    googleId                String?   @unique
+    stripeCustomerId        String?
+    subscriptionStatus      String?
+    subscriptionOfferId     String?
+    trialEndsAt             DateTime?
+    currentPeriodEnd        DateTime?
+    stripeSubscriptionId    String?
+    referredByWaitlistCode  String?
+    notificationPreferences Json?
+    createdAt               DateTime  @default(now())
 
     stories              Story[]
     characters           Character[]
@@ -279,6 +281,7 @@ model Waitlist {
     referralCode               String    @unique
     referredById               String?   @db.ObjectId
     referralsCount             Int       @default(0)
+    paidReferralsCount         Int       @default(0)
     confirmedAt                DateTime?
     confirmationTokenHash      String?
     confirmationTokenExpiresAt DateTime?
