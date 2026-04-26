@@ -10,7 +10,6 @@ interface GoogleUserData {
   email: string;
   name: string | null;
   image: string | null;
-  referralCode?: string | null;
 }
 
 export type WaitlistRejectionReason =
@@ -42,23 +41,6 @@ export class AuthService {
         await this.createReferralForUser(existing.id);
       }
 
-      // Apply referral benefit to existing users — only once (no prior referral)
-      if (data.referralCode && !existing.referredByReferralId) {
-        const referralValidation = await this.validateAndApplyReferralCode(data.referralCode);
-        if (referralValidation.valid && referralValidation.referralId) {
-          const trialEndsAt = new Date();
-          trialEndsAt.setDate(trialEndsAt.getDate() + 30);
-          await this.prisma.user.update({
-            where: { id: existing.id },
-            data: { referredByReferralId: referralValidation.referralId, trialEndsAt },
-          });
-          await this.prisma.referral.update({
-            where: { id: referralValidation.referralId },
-            data: { referralsCount: { increment: 1 } },
-          });
-        }
-      }
-
       const user = await this.prisma.user.update({
         where: { id: existing.id },
         data: { name: data.name, image: data.image },
@@ -66,18 +48,8 @@ export class AuthService {
       return { user, isNew: false };
     }
 
-    // Validate referral code and determine trial duration
-    let trialDays = 7; // default
-    let referredByReferralId: string | undefined;
-
-    if (data.referralCode) {
-      const referralValidation = await this.validateAndApplyReferralCode(data.referralCode);
-      if (referralValidation.valid && referralValidation.referralId) {
-        trialDays = 30;
-        referredByReferralId = referralValidation.referralId;
-      }
-    }
-
+    // New user — 7-day default trial
+    const trialDays = 7;
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
@@ -89,19 +61,11 @@ export class AuthService {
         image: data.image,
         subscriptionStatus: 'trialing',
         trialEndsAt,
-        referredByReferralId,
       },
     });
 
-    // Create Referral record; also increment referralsCount on the referrer
+    // Create Referral record for the new user
     await this.createReferralForUser(newUser.id);
-
-    if (referredByReferralId) {
-      await this.prisma.referral.update({
-        where: { id: referredByReferralId },
-        data: { referralsCount: { increment: 1 } },
-      });
-    }
 
     return { user: newUser, isNew: true };
   }

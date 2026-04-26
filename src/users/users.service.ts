@@ -73,6 +73,55 @@ export class UsersService {
     };
   }
 
+  async applyReferral(
+    userId: string,
+    code: string,
+  ): Promise<{ applied: boolean; trialEndsAt?: Date }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { referredByReferralId: true, trialEndsAt: true },
+    });
+
+    // Already used a referral
+    if (!user || user.referredByReferralId) {
+      return { applied: false };
+    }
+
+    const normalizedCode = code.trim().toUpperCase();
+    const referral = await this.prisma.referral.findUnique({
+      where: { referralCode: normalizedCode },
+    });
+
+    if (!referral) {
+      return { applied: false };
+    }
+
+    // Self-referral guard
+    if (referral.userId === userId) {
+      return { applied: false };
+    }
+
+    // Extend trial: max(existing trialEndsAt, now + 30 days)
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const trialEndsAt =
+      user.trialEndsAt && user.trialEndsAt > thirtyDaysFromNow
+        ? user.trialEndsAt
+        : thirtyDaysFromNow;
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { referredByReferralId: referral.id, trialEndsAt },
+    });
+
+    await this.prisma.referral.update({
+      where: { id: referral.id },
+      data: { referralsCount: { increment: 1 } },
+    });
+
+    return { applied: true, trialEndsAt };
+  }
+
   async updateNotifications(userId: string, preferences: Record<string, any>) {
     return this.prisma.user.update({
       where: { id: userId },

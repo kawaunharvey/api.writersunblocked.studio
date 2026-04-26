@@ -6,9 +6,10 @@ import {
     Delete,
     Get,
     Patch,
+    Post,
     Req
 } from '@nestjs/common'
-import { IsString, Matches, MaxLength, MinLength } from 'class-validator'
+import { IsNotEmpty, IsString, Matches, MaxLength, MinLength } from 'class-validator'
 import { UsersService, isValidHandle, normalizeHandle } from './users.service'
 
 class UpdateHandleDto {
@@ -29,6 +30,12 @@ class UpdateMeDto {
 class UpdateNotificationsDto {
   // Allow any boolean fields for notification preferences
   [key: string]: any;
+}
+
+class ApplyReferralDto {
+  @IsString()
+  @IsNotEmpty()
+  code: string;
 }
 
 @Controller('users')
@@ -74,6 +81,12 @@ export class UsersController {
   async getReferralInfo(@Req() req: any) {
     const { userId } = req.user as { userId: string };
     return this.usersService.getReferralInfo(userId);
+  }
+
+  @Post('me/referral/apply')
+  async applyReferral(@Req() req: any, @Body() dto: ApplyReferralDto) {
+    const { userId } = req.user as { userId: string };
+    return this.usersService.applyReferral(userId, dto.code);
   }
 
   @Patch('me/notifications')

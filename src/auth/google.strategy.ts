@@ -48,14 +48,11 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       }
     }
 
-    const referralCode = req.cookies?.oauth_referral || null;
-
     return this.authService.upsertGoogleUser({
       googleId: profile.id,
       email: normalizedEmail,
       name: profile.displayName ?? null,
       image: profile.photos?.[0]?.value ?? null,
-      referralCode,
     });
   }
 }

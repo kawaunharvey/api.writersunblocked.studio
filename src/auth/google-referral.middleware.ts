@@ -14,16 +14,11 @@ export class GoogleReferralMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     const isProduction = process.env.NODE_ENV === 'production';
     const cookieOptions = {
-      maxAge: 5 * 60 * 1000, // 5 minutes — just long enough to complete OAuth
+      maxAge: 5 * 60 * 1000,
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax' as const,
     };
-
-    const referral = req.query?.referral;
-    if (referral && typeof referral === 'string' && referral.trim().length > 0) {
-      res.cookie('oauth_referral', referral.trim().toUpperCase(), cookieOptions);
-    }
 
     const mode = req.query?.mode;
     if (mode === 'signup' || mode === 'login') {

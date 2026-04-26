@@ -49,8 +49,7 @@ export class AuthController {
     const isProduction = this.config.nodeEnv === 'production';
     const cookieDomain = this.getCookieDomain(isProduction);
 
-    // Clear the short-lived OAuth cookies — they have done their job.
-    res.clearCookie('oauth_referral', { httpOnly: true, secure: isProduction, sameSite: 'lax' });
+    // Clear the short-lived OAuth mode cookie — it has done its job.
     res.clearCookie('oauth_mode', { httpOnly: true, secure: isProduction, sameSite: 'lax' });
 
     if (cookieDomain) {
