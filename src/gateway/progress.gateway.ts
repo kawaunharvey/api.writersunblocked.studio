@@ -114,6 +114,37 @@ export class ProgressGateway {
     this.server.to(storyId).emit('onboarding:complete', { storyId });
   }
 
+  emitStoryboardCommentCreated(storyId: string, comment: unknown): void {
+    this.logger.debug(`Emitting storyboard-comment:created for story=${storyId}`)
+    this.server.to(storyId).emit('storyboard-comment:created', { storyId, comment })
+  }
+
+  emitStoryboardCommentUpdated(storyId: string, comment: unknown): void {
+    this.logger.debug(`Emitting storyboard-comment:updated for story=${storyId}`)
+    this.server.to(storyId).emit('storyboard-comment:updated', { storyId, comment })
+  }
+
+  emitStoryboardCommentDeleted(
+    storyId: string,
+    payload: { commentId: string; blockId: string; deletedIds: string[] },
+  ): void {
+    this.logger.debug(`Emitting storyboard-comment:deleted for story=${storyId}`)
+    this.server.to(storyId).emit('storyboard-comment:deleted', {
+      storyId,
+      ...payload,
+    })
+  }
+
+  emitStoryboardCommentResolved(storyId: string, comment: unknown): void {
+    this.logger.debug(`Emitting storyboard-comment:resolved for story=${storyId}`)
+    this.server.to(storyId).emit('storyboard-comment:resolved', { storyId, comment })
+  }
+
+  emitStoryboardCommentReopened(storyId: string, comment: unknown): void {
+    this.logger.debug(`Emitting storyboard-comment:reopened for story=${storyId}`)
+    this.server.to(storyId).emit('storyboard-comment:reopened', { storyId, comment })
+  }
+
   @SubscribeMessage('join-story')
   handleJoinStory(
     @ConnectedSocket() client: Socket,

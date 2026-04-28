@@ -3,6 +3,7 @@ export const EVENT_GROUP = {
   AI: 'ai',
   SIMULATION: 'simulation',
   BLOCK_ANALYSIS: 'block_analysis',
+  COMMENTS: 'comments',
 } as const;
 
 export type EventGroup = (typeof EVENT_GROUP)[keyof typeof EVENT_GROUP];
@@ -24,6 +25,13 @@ export const EVENT_TYPE = {
   BLOCK_ANALYSIS_QUEUED: 'block.analysis.queued',
   BLOCK_ANALYSIS_COMPLETED: 'block.analysis.completed',
   BLOCK_ANALYSIS_FAILED: 'block.analysis.failed',
+
+  // Storyboard comments lifecycle
+  STORYBOARD_COMMENT_CREATED: 'storyboard.comment.created',
+  STORYBOARD_COMMENT_UPDATED: 'storyboard.comment.updated',
+  STORYBOARD_COMMENT_DELETED: 'storyboard.comment.deleted',
+  STORYBOARD_COMMENT_RESOLVED: 'storyboard.comment.resolved',
+  STORYBOARD_COMMENT_REOPENED: 'storyboard.comment.reopened',
 } as const;
 
 export type EventType = (typeof EVENT_TYPE)[keyof typeof EVENT_TYPE];

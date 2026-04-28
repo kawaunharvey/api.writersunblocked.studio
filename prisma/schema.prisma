@@ -1,346 +1,377 @@
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "mongodb"
-    url      = env("DATABASE_URL")
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-    id                      String    @id @default(auto()) @map("_id") @db.ObjectId
-    email                   String    @unique
-    name                    String?
-    handle                  String?   @unique
-    image                   String?
-    googleId                String?   @unique
-    stripeCustomerId        String?
-    subscriptionStatus      String?
-    subscriptionOfferId     String?
-    trialEndsAt             DateTime?
-    currentPeriodEnd        DateTime?
-    stripeSubscriptionId    String?
-    referredByReferralId    String?   @db.ObjectId
-    notificationPreferences Json?
-    createdAt               DateTime  @default(now())
+  id                      String    @id @default(auto()) @map("_id") @db.ObjectId
+  email                   String    @unique
+  name                    String?
+  handle                  String?   @unique
+  image                   String?
+  googleId                String?   @unique
+  stripeCustomerId        String?
+  subscriptionStatus      String?
+  subscriptionOfferId     String?
+  trialEndsAt             DateTime?
+  currentPeriodEnd        DateTime?
+  stripeSubscriptionId    String?
+  referredByReferralId    String?   @db.ObjectId
+  notificationPreferences Json?
+  createdAt               DateTime  @default(now())
 
-    stories              Story[]
-    characters           Character[]
-    locations            Location[]
-    referenceTerms       ReferenceTerm[]
-    referenceOccurrences ReferenceOccurrence[]
-    referral             Referral?             @relation("UserOwnReferral")
-    referredByReferral   Referral?             @relation("UserReferredBy", fields: [referredByReferralId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  stories              Story[]
+  characters           Character[]
+  locations            Location[]
+  storyboardComments   StoryboardComment[]
+  referenceTerms       ReferenceTerm[]
+  referenceOccurrences ReferenceOccurrence[]
+  referral             Referral?             @relation("UserOwnReferral")
+  referredByReferral   Referral?             @relation("UserReferredBy", fields: [referredByReferralId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model Story {
-    id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-    userId             String   @db.ObjectId
-    title              String   @default("Untitled")
-    mode               String   @default("novel")
-    penName            String?
-    onboardingComplete Boolean  @default(false)
-    wordCount          Int      @default(0)
-    lastEditedAt       DateTime @default(now())
-    createdAt          DateTime @default(now())
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String   @db.ObjectId
+  title              String   @default("Untitled")
+  mode               String   @default("novel")
+  penName            String?
+  onboardingComplete Boolean  @default(false)
+  wordCount          Int      @default(0)
+  lastEditedAt       DateTime @default(now())
+  createdAt          DateTime @default(now())
 
-    user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-    blocks               Block[]
-    passages             Passage[]
-    characters           Character[]
-    locations            Location[]
-    worldCanon           WorldCanon?
-    dreamThreads         DreamThread[]
-    storyboardNotes      StoryboardNote[]
-    referenceTerms       ReferenceTerm[]
-    referenceOccurrences ReferenceOccurrence[]
-    simulations          SimulationRun[]
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blocks               Block[]
+  passages             Passage[]
+  characters           Character[]
+  locations            Location[]
+  worldCanon           WorldCanon?
+  dreamThreads         DreamThread[]
+  storyboardNotes      StoryboardNote[]
+  storyboardComments   StoryboardComment[]
+  referenceTerms       ReferenceTerm[]
+  referenceOccurrences ReferenceOccurrence[]
+  simulations          SimulationRun[]
 }
 
 model Block {
-    id                  String    @id @default(auto()) @map("_id") @db.ObjectId
-    storyId             String    @db.ObjectId
-    passageId           String?   @db.ObjectId
-    type                String
-    content             String
-    contentJSON         Json
-    order               Float
-    status              String    @default("pending")
-    hash                String?
-    analyzedContentHash String?
-    analysisResult      Json?
-    lastAnalyzedAt      DateTime?
-    analysisSkipped     Boolean   @default(false)
-    analysisFailCount   Int       @default(0)
-    createdAt           DateTime  @default(now())
-    updatedAt           DateTime  @updatedAt
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  storyId             String    @db.ObjectId
+  passageId           String?   @db.ObjectId
+  type                String
+  content             String
+  contentJSON         Json
+  order               Float
+  status              String    @default("pending")
+  hash                String?
+  analyzedContentHash String?
+  analysisResult      Json?
+  lastAnalyzedAt      DateTime?
+  analysisSkipped     Boolean   @default(false)
+  analysisFailCount   Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-    story                Story                 @relation(fields: [storyId], references: [id], onDelete: Cascade)
-    passage              Passage?              @relation(fields: [passageId], references: [id], onDelete: Cascade)
-    threads              Thread[]
-    referenceOccurrences ReferenceOccurrence[]
+  story                Story                 @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  passage              Passage?              @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  threads              Thread[]
+  storyboardComments   StoryboardComment[]
+  referenceOccurrences ReferenceOccurrence[]
 
-    @@index([storyId, order])
-    @@index([passageId, order])
-    @@index([storyId, analysisSkipped, lastAnalyzedAt])
+  @@index([storyId, order])
+  @@index([passageId, order])
+  @@index([storyId, analysisSkipped, lastAnalyzedAt])
 }
 
 model Passage {
-    id                  String   @id @default(auto()) @map("_id") @db.ObjectId
-    storyId             String   @db.ObjectId
-    title               String   @default("Untitled Passage")
-    order               Float
-    visible             Boolean  @default(true)
-    wordCount           Int      @default(0)
-    threadCount         Int      @default(0)
-    characterCount      Int      @default(0)
-    locationCount       Int      @default(0)
-    chapters            Json[]   @default([])
-    identifyingChapters String[] @default([])
-    createdAt           DateTime @default(now())
-    updatedAt           DateTime @updatedAt
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId             String   @db.ObjectId
+  title               String   @default("Untitled Passage")
+  order               Float
+  visible             Boolean  @default(true)
+  wordCount           Int      @default(0)
+  threadCount         Int      @default(0)
+  characterCount      Int      @default(0)
+  locationCount       Int      @default(0)
+  chapters            Json[]   @default([])
+  identifyingChapters String[] @default([])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-    story   Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
-    blocks  Block[]
-    threads Thread[]
-    notes   PassageNote[]
+  story   Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  blocks  Block[]
+  threads Thread[]
+  notes   PassageNote[]
 
-    @@index([storyId, order])
-    @@index([storyId, visible, order])
+  @@index([storyId, order])
+  @@index([storyId, visible, order])
 }
 
 model PassageNote {
-    id        String   @id @default(auto()) @map("_id") @db.ObjectId
-    passageId String   @db.ObjectId
-    content   String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  passageId String   @db.ObjectId
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    passage Passage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  passage Passage @relation(fields: [passageId], references: [id], onDelete: Cascade)
 
-    @@index([passageId, createdAt])
+  @@index([passageId, createdAt])
 }
 
 model ReferenceTerm {
-    id             String   @id @default(auto()) @map("_id") @db.ObjectId
-    storyId        String   @db.ObjectId
-    userId         String   @db.ObjectId
-    entityId       String   @db.ObjectId
-    entityType     String
-    text           String
-    normalizedText String
-    color          String?
-    createdAt      DateTime @default(now())
-    updatedAt      DateTime @updatedAt
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId        String   @db.ObjectId
+  userId         String   @db.ObjectId
+  entityId       String   @db.ObjectId
+  entityType     String
+  text           String
+  normalizedText String
+  color          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-    story       Story                 @relation(fields: [storyId], references: [id], onDelete: Cascade)
-    user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-    occurrences ReferenceOccurrence[]
+  story       Story                 @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  occurrences ReferenceOccurrence[]
 
-    @@unique([storyId, entityId, entityType, normalizedText])
-    @@index([storyId, entityType, normalizedText])
+  @@unique([storyId, entityId, entityType, normalizedText])
+  @@index([storyId, entityType, normalizedText])
 }
 
 model ReferenceOccurrence {
-    id         String   @id @default(auto()) @map("_id") @db.ObjectId
-    storyId    String   @db.ObjectId
-    blockId    String   @db.ObjectId
-    userId     String   @db.ObjectId
-    termId     String   @db.ObjectId
-    entityId   String   @db.ObjectId
-    entityType String
-    text       String
-    color      String?
-    source     String   @default("inferred")
-    confidence Float    @default(0.5)
-    createdAt  DateTime @default(now())
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId    String   @db.ObjectId
+  blockId    String   @db.ObjectId
+  userId     String   @db.ObjectId
+  termId     String   @db.ObjectId
+  entityId   String   @db.ObjectId
+  entityType String
+  text       String
+  color      String?
+  source     String   @default("inferred")
+  confidence Float    @default(0.5)
+  createdAt  DateTime @default(now())
 
-    story Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
-    block Block         @relation(fields: [blockId], references: [id], onDelete: Cascade)
-    user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-    term  ReferenceTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  story Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  block Block         @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  term  ReferenceTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
 
-    @@unique([blockId, termId])
-    @@index([storyId, entityType, entityId])
-    @@index([blockId])
+  @@unique([blockId, termId])
+  @@index([storyId, entityType, entityId])
+  @@index([blockId])
 }
 
 model Character {
-    id             String   @id @default(auto()) @map("_id") @db.ObjectId
-    storyId        String   @db.ObjectId
-    userId         String   @db.ObjectId
-    name           String
-    initials       String
-    color          String
-    seedPrompt     String   @default("")
-    weight         Int      @default(5)
-    superObjective String   @default("")
-    coreFear       String   @default("")
-    customTags     Json[]   @default([])
-    mentionCount   Int      @default(0)
-    aliases        Json[]   @default([])
-    createdAt      DateTime @default(now())
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId        String   @db.ObjectId
+  userId         String   @db.ObjectId
+  name           String
+  initials       String
+  color          String
+  seedPrompt     String   @default("")
+  weight         Int      @default(5)
+  superObjective String   @default("")
+  coreFear       String   @default("")
+  customTags     Json[]   @default([])
+  mentionCount   Int      @default(0)
+  aliases        Json[]   @default([])
+  createdAt      DateTime @default(now())
 
-    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
-    user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Location {
-    id           String   @id @default(auto()) @map("_id") @db.ObjectId
-    storyId      String   @db.ObjectId
-    userId       String   @db.ObjectId
-    name         String
-    color        String   @default("teal")
-    description  String   @default("")
-    mentionCount Int      @default(0)
-    createdAt    DateTime @default(now())
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId      String   @db.ObjectId
+  userId       String   @db.ObjectId
+  name         String
+  color        String   @default("teal")
+  description  String   @default("")
+  mentionCount Int      @default(0)
+  createdAt    DateTime @default(now())
 
-    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
-    user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Thread {
-    id            String   @id @default(auto()) @map("_id") @db.ObjectId
-    blockId       String   @db.ObjectId
-    storyId       String   @db.ObjectId
-    passageId     String?  @db.ObjectId
-    entityId      String   @db.ObjectId
-    entityType    String
-    blockOrder    Float
-    observation   String
-    interactions  String[]
-    emotionalTone String?
-    superObjAlign String?
-    createdAt     DateTime @default(now())
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  blockId       String   @db.ObjectId
+  storyId       String   @db.ObjectId
+  passageId     String?  @db.ObjectId
+  entityId      String   @db.ObjectId
+  entityType    String
+  blockOrder    Float
+  observation   String
+  interactions  String[]
+  emotionalTone String?
+  superObjAlign String?
+  createdAt     DateTime @default(now())
 
-    block   Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
-    passage Passage? @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  block   Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  passage Passage? @relation(fields: [passageId], references: [id], onDelete: Cascade)
 
-    @@unique([blockId, entityId])
-    @@index([storyId, entityId, blockOrder])
-    @@index([blockId])
-    @@index([passageId])
+  @@unique([blockId, entityId])
+  @@index([storyId, entityId, blockOrder])
+  @@index([blockId])
+  @@index([passageId])
 }
 
 model SimulationRun {
-    id               String   @id @default(auto()) @map("_id") @db.ObjectId
-    storyId          String   @db.ObjectId
-    userId           String   @db.ObjectId
-    highlightBlockId String?  @db.ObjectId
-    question         String?
-    focalEntityId    String?  @db.ObjectId
-    blockRangeIds    String[]
-    sensoryPresent   Json
-    candidates       Json[]
-    surfaced         String[]
-    dreamThreadIds   String[] @default([]) @db.ObjectId
-    userAction       String?
-    promotedTier     String?
-    createdAt        DateTime @default(now())
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId          String   @db.ObjectId
+  userId           String   @db.ObjectId
+  highlightBlockId String?  @db.ObjectId
+  question         String?
+  focalEntityId    String?  @db.ObjectId
+  blockRangeIds    String[]
+  sensoryPresent   Json
+  candidates       Json[]
+  surfaced         String[]
+  dreamThreadIds   String[] @default([]) @db.ObjectId
+  userAction       String?
+  promotedTier     String?
+  createdAt        DateTime @default(now())
 
-    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
 }
 
 model WorldCanon {
-    id        String   @id @default(auto()) @map("_id") @db.ObjectId
-    storyId   String   @unique @db.ObjectId
-    rules     Json
-    updatedAt DateTime @updatedAt
-    createdAt DateTime @default(now())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId   String   @unique @db.ObjectId
+  rules     Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 
-    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
 }
 
 model DreamThread {
-    id             String   @id @default(auto()) @map("_id") @db.ObjectId
-    storyId        String   @db.ObjectId
-    type           String
-    body           String
-    sourceEntities String[] @db.ObjectId
-    version        Int      @default(1)
-    createdAt      DateTime @default(now())
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId        String   @db.ObjectId
+  type           String
+  body           String
+  sourceEntities String[] @db.ObjectId
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
 
-    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
 
-    @@index([storyId])
+  @@index([storyId])
 }
 
 model StoryboardNote {
-    id        String   @id @default(auto()) @map("_id") @db.ObjectId
-    storyId   String   @db.ObjectId
-    passageId String   @unique @db.ObjectId
-    body      String
-    updatedAt DateTime @updatedAt
-    createdAt DateTime @default(now())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId   String   @db.ObjectId
+  passageId String   @unique @db.ObjectId
+  body      String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 
-    story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+}
+
+model StoryboardComment {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  storyId          String    @db.ObjectId
+  blockId          String    @db.ObjectId
+  userId           String    @db.ObjectId
+  parentId         String?   @db.ObjectId
+  body             String
+  anchorOffset     Int?
+  anchorLength     Int?
+  anchorText       String?
+  isStale          Boolean   @default(false)
+  resolvedAt       DateTime?
+  resolvedByUserId String?   @db.ObjectId
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  story   Story               @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  block   Block               @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  StoryboardComment?  @relation("StoryboardCommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies StoryboardComment[] @relation("StoryboardCommentReplies")
+
+  @@index([storyId, createdAt])
+  @@index([storyId, blockId, createdAt])
+  @@index([parentId, createdAt])
+  @@index([storyId, resolvedAt, createdAt])
 }
 
 model Referral {
-    id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-    userId             String   @unique @db.ObjectId
-    referralCode       String   @unique
-    referralsCount     Int      @default(0)
-    paidReferralsCount Int      @default(0)
-    createdAt          DateTime @default(now())
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String   @unique @db.ObjectId
+  referralCode       String   @unique
+  referralsCount     Int      @default(0)
+  paidReferralsCount Int      @default(0)
+  createdAt          DateTime @default(now())
 
-    user          User   @relation("UserOwnReferral", fields: [userId], references: [id], onDelete: Cascade)
-    referredUsers User[] @relation("UserReferredBy")
+  user          User   @relation("UserOwnReferral", fields: [userId], references: [id], onDelete: Cascade)
+  referredUsers User[] @relation("UserReferredBy")
 }
 
 model Waitlist {
-    id                         String    @id @default(auto()) @map("_id") @db.ObjectId
-    email                      String    @unique
-    approved                   Boolean   @default(false)
-    referralCode               String    @unique
-    referredById               String?   @db.ObjectId
-    referralsCount             Int       @default(0)
-    paidReferralsCount         Int       @default(0)
-    confirmedAt                DateTime?
-    confirmationTokenHash      String?
-    confirmationTokenExpiresAt DateTime?
-    referralCreditedAt         DateTime?
-    createdAt                  DateTime  @default(now())
+  id                         String    @id @default(auto()) @map("_id") @db.ObjectId
+  email                      String    @unique
+  approved                   Boolean   @default(false)
+  referralCode               String    @unique
+  referredById               String?   @db.ObjectId
+  referralsCount             Int       @default(0)
+  paidReferralsCount         Int       @default(0)
+  confirmedAt                DateTime?
+  confirmationTokenHash      String?
+  confirmationTokenExpiresAt DateTime?
+  referralCreditedAt         DateTime?
+  createdAt                  DateTime  @default(now())
 
-    @@index([confirmedAt, referralsCount, createdAt])
-    @@index([referredById])
+  @@index([confirmedAt, referralsCount, createdAt])
+  @@index([referredById])
 }
 
 // Generic event log — metadata only, no prompt/response content.
 // userId and storyId are stored as plain strings (no Prisma relation) so
 // this table remains decoupled and events survive entity deletion.
 model AppEvent {
-    id String @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-    // Taxonomy
-    eventType  String // e.g. "ai.call.completed", "simulation.run.cache_hit"
-    eventGroup String // e.g. "ai", "simulation", "block_analysis"
-    source     String // service/worker name that emitted the event
+  // Taxonomy
+  eventType  String // e.g. "ai.call.completed", "simulation.run.cache_hit"
+  eventGroup String // e.g. "ai", "simulation", "block_analysis"
+  source     String // service/worker name that emitted the event
 
-    // Outcome
-    status     String // "success" | "error" | "skipped"
-    occurredAt DateTime @default(now())
-    durationMs Int?
+  // Outcome
+  status     String // "success" | "error" | "skipped"
+  occurredAt DateTime @default(now())
+  durationMs Int?
 
-    // Ownership (plain ObjectId strings — no cascade relation)
-    userId  String? @db.ObjectId
-    storyId String? @db.ObjectId
+  // Ownership (plain ObjectId strings — no cascade relation)
+  userId  String? @db.ObjectId
+  storyId String? @db.ObjectId
 
-    // Tracing
-    requestId String? // propagated from HTTP request-id header when available
+  // Tracing
+  requestId String? // propagated from HTTP request-id header when available
 
-    // AI-specific usage (counts only — no tokens from prompt/response bodies)
-    provider         String? // "anthropic" | "openai"
-    model            String? // e.g. "gpt-4o-mini", "claude-sonnet-4-20250514"
-    inputUnits       Int? // input token count returned by provider SDK
-    outputUnits      Int? // output token count returned by provider SDK
-    estimatedCostUsd Float? // estimated USD cost based on published per-token pricing
+  // AI-specific usage (counts only — no tokens from prompt/response bodies)
+  provider         String? // "anthropic" | "openai"
+  model            String? // e.g. "gpt-4o-mini", "claude-sonnet-4-20250514"
+  inputUnits       Int? // input token count returned by provider SDK
+  outputUnits      Int? // output token count returned by provider SDK
+  estimatedCostUsd Float? // estimated USD cost based on published per-token pricing
 
-    // Event-type-specific payload (sanitized, no user content)
-    metadata Json
+  // Event-type-specific payload (sanitized, no user content)
+  metadata Json
 
-    @@index([eventGroup, occurredAt])
-    @@index([eventType, occurredAt])
-    @@index([userId, occurredAt])
-    @@index([storyId, occurredAt])
+  @@index([eventGroup, occurredAt])
+  @@index([eventType, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([storyId, occurredAt])
 }
