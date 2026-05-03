@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../database/prisma.service'
 
 interface ThreadUpsertData {
@@ -14,7 +14,13 @@ interface ThreadUpsertData {
 
 @Injectable()
 export class ThreadsService {
+  private readonly logger = new Logger(ThreadsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  private isObjectId(value: string): boolean {
+    return /^[a-fA-F0-9]{24}$/.test(value);
+  }
 
   private normalizeObservation(value: unknown): string {
     if (typeof value === 'string') {
@@ -66,13 +72,35 @@ export class ThreadsService {
   }
 
   async findByEntityIds(storyId: string, entityIds: string[]) {
-    const sanitizedEntityIds = [...new Set(entityIds.filter((entityId) => typeof entityId === 'string' && entityId.trim().length > 0))];
-    if (sanitizedEntityIds.length === 0) {
+    const dedupedEntityIds = [
+      ...new Set(
+        entityIds
+          .filter((entityId) => typeof entityId === 'string')
+          .map((entityId) => entityId.trim())
+          .filter((entityId) => entityId.length > 0),
+      ),
+    ];
+
+    const validEntityIds = dedupedEntityIds.filter((entityId) =>
+      this.isObjectId(entityId),
+    );
+
+    const invalidEntityIds = dedupedEntityIds.filter(
+      (entityId) => !this.isObjectId(entityId),
+    );
+
+    if (invalidEntityIds.length > 0) {
+      this.logger.warn(
+        `Dropping invalid entity IDs in findByEntityIds: ${invalidEntityIds.join(', ')}`,
+      );
+    }
+
+    if (validEntityIds.length === 0) {
       return [];
     }
 
     return this.prisma.thread.findMany({
-      where: { storyId, entityId: { in: sanitizedEntityIds } },
+      where: { storyId, entityId: { in: validEntityIds } },
       orderBy: { blockOrder: 'asc' },
     });
   }
