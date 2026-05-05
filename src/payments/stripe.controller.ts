@@ -1,14 +1,14 @@
 import {
+  BadRequestException,
   Controller,
+  Headers,
+  Logger,
   Post,
   Req,
   Res,
-  Headers,
-  Logger,
-  BadRequestException,
-} from '@nestjs/common';
-import { Public } from '../auth/public.decorator';
-import { StripeService } from './stripe.service';
+} from '@nestjs/common'
+import { Public } from '../auth/public.decorator'
+import { StripeService } from './stripe.service'
 
 @Controller('webhooks')
 export class StripeController {
@@ -37,6 +37,7 @@ export class StripeController {
 
     try {
       switch (event.type) {
+        case 'customer.subscription.created':
         case 'customer.subscription.updated':
           await this.stripeService.handleSubscriptionUpdated(
             event.data.object,

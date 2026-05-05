@@ -1,9 +1,9 @@
-import { Module } from '@nestjs/common';
-import { StripeService } from './stripe.service';
-import { StripeController } from './stripe.controller';
-import { PaymentsController } from './payments.controller';
-import { AppConfigModule } from '../common/config/config.module';
-import { DatabaseModule } from '../database/database.module';
+import { Module } from '@nestjs/common'
+import { AppConfigModule } from '../common/config/config.module'
+import { DatabaseModule } from '../database/database.module'
+import { PaymentsController } from './payments.controller'
+import { StripeController } from './stripe.controller'
+import { StripeService } from './stripe.service'
 
 @Module({
   imports: [AppConfigModule, DatabaseModule],

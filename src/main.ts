@@ -1,14 +1,21 @@
-import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { Logger } from 'nestjs-pino';
-import { AppConfigService } from './common/config/app-config.service';
-import { AppModule } from './app.module';
-import * as express from 'express';
-import cookieParser from 'cookie-parser';
+import { ValidationPipe } from '@nestjs/common'
+import { NestFactory } from '@nestjs/core'
+import cookieParser from 'cookie-parser'
+import * as express from 'express'
+import { Logger } from 'nestjs-pino'
+import { AppModule } from './app.module'
+import { AppConfigService } from './common/config/app-config.service'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
+
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.getInstance().disable('x-powered-by');
+  app.use((_req: any, res: any, next: any) => {
+    res.setHeader('x-company-name', 'The Hereafter Technologies');
+    next();
+  });
 
   const config = app.get(AppConfigService);
   const logger = app.get(Logger);

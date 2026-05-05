@@ -26,6 +26,7 @@ import { WorkerModule } from './queues/worker.module'
 import { SimulationModule } from './simulation/simulation.module'
 import { StoriesModule } from './stories/stories.module'
 import { StoryboardNotesModule } from './storyboard-notes/storyboard-notes.module'
+import { SubscriptionsModule } from './subscriptions/subscriptions.module'
 import { ThreadsModule } from './threads/threads.module'
 import { UsersModule } from './users/users.module'
 import { WorldCanonModule } from './world-canon/world-canon.module'
@@ -125,6 +126,7 @@ type RequestWithIds = IncomingMessage & {
     PaymentsModule,
     EmailModule,
     ApiModule,
+    SubscriptionsModule
   ],
   controllers: [AppController],
   providers: [

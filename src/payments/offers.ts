@@ -38,7 +38,7 @@ export type TierPolicy = Pick<
 // free
 const FREE_OFFER: OfferConfig = {
     id: 'free-plan',
-  tier: 'free',
+    tier: 'free',
     name: 'Free Plan',
     description:
       'Get started with the free plan to explore the product with limited access.',
@@ -49,10 +49,12 @@ const FREE_OFFER: OfferConfig = {
     badge: 'Free',
     isActive: true,
     includes: [
-      '1 project',
-      '5 story simulations',
-      'Unlimited characters, locations, and passages',
-      'Storyboard that analyzes your manuscript'
+      '1 active story',
+      'Basic editor plus passages',
+      'Limited storyboard',
+      'Community challenges',
+      'Block-level analysis: 6h cadence',
+      // 'GPT-4.1 nano + Batch API'
     ],
     maxActiveProjects: 1,
     model: '4.1-nano',
@@ -68,7 +70,7 @@ const FREE_OFFER: OfferConfig = {
 
 const STARTER_MONTHLY: OfferConfig = {
     id: 'starter-monthly',
-  tier: 'starter',
+    tier: 'starter',
     name: 'Starter Plan',
     description: 'Perfect for individuals just getting started.',
     price: '$6',
@@ -78,9 +80,12 @@ const STARTER_MONTHLY: OfferConfig = {
     badge: 'Starter',
     isActive: false,
     includes: [
-      'Everything in Free Plan plus',
-      '10 story simulations',
-      'OpenAI Batch processing for lower-cost analysis'
+      '3 active stories',
+      'Full Storyboard access',
+      'AI Insights (basic)',
+      'Social features',
+      'Block-level analysis: 3h cadence',
+      // 'GPT-4.1 nano + Batch API'
     ],
     maxBlocksAnalyzed: 50,
     maxActiveProjects: 3,
@@ -107,9 +112,13 @@ const WRITER_MONTHLY: OfferConfig = {
   badge: 'Writer',
   isActive: false,
   includes: [
-    'Everything in Starter Plan plus',
-    '20 story simulations',
-    'Weekly consistency re-analysis'
+    'Unlimited stories',
+    'Full AI Insights panel',
+    'Weekly consistency re-analysis',
+    'World simulations',
+    'Export: EPUB, PDF, DOCX',
+    'Block-level analysis: 1h cadence',
+    // 'Sprint hosting'
   ],
   maxBlocksAnalyzed: 200,
   maxActiveProjects: 5,
@@ -135,10 +144,12 @@ const PRO_MONTHLY: OfferConfig = {
     badge: 'Pro',
     isActive: false,
     includes: [
-      'Everything in Writer Plan plus',
-      '50 story simulations',
-      'Full-manuscript simulation context',
-      'Priority support'
+      'Everything in Writer',
+      // 'Standard GPT-4o-mini access',
+      '30m scan cadence',
+      'Priority queuing',
+      'Advanded world simulations',
+      'Early feature access',
     ],
     maxActiveProjects: 'unlimited',
     model: '4o-mini',
@@ -156,9 +167,8 @@ const PRO_MONTHLY: OfferConfig = {
 // Early Bird - temporary promotional offer
 const EARLY_BIRD_MONTHLY: OfferConfig = Object.assign({}, STARTER_MONTHLY, {
     id: 'early-bird-monthly',
-  tier: 'starter',
     name: 'Early Bird Special',
-  description: 'Starter tier access at early bird monthly pricing.',
+    description: 'Starter tier access at early bird monthly pricing.',
     price: '$10',
     amountCents: 1000,
     badge: 'Best Value',
@@ -167,7 +177,6 @@ const EARLY_BIRD_MONTHLY: OfferConfig = Object.assign({}, STARTER_MONTHLY, {
 
 const EARLY_BIRD_ANNUAL: OfferConfig = Object.assign({}, EARLY_BIRD_MONTHLY, {
     id: 'early-bird-annual',
-  tier: 'starter',
     interval: 'year',
     price: '$100',
     amountCents: 10000,

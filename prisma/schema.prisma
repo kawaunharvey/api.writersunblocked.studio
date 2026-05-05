@@ -24,6 +24,7 @@ model User {
   notificationPreferences Json?
   createdAt               DateTime  @default(now())
 
+  subscription         UserSubscription?     @relation("UserSubscriber")
   stories              Story[]
   characters           Character[]
   locations            Location[]
@@ -335,6 +336,33 @@ model Waitlist {
 
   @@index([confirmedAt, referralsCount, createdAt])
   @@index([referredById])
+}
+
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  canceled
+  unpaid
+}
+
+enum PaidSubscriptionTier {
+  starter
+  writer
+  pro
+}
+
+model UserSubscription {
+  id                 String               @id @default(auto()) @map("_id") @db.ObjectId
+  user               User                 @relation("UserSubscriber", fields: [userId], references: [id], onDelete: Cascade)
+  userId             String               @unique @db.ObjectId
+  stripeCustomerId   String?
+  subscriptionStatus SubscriptionStatus?
+  tier               PaidSubscriptionTier
+  metadata           Json? // for extensibility, e.g. recording referral source, promotion code, etc.
+  expiresAt          DateTime
+  trialEndsAt        DateTime?            @default(now())
+  createdAt          DateTime             @default(now())
 }
 
 // Generic event log — metadata only, no prompt/response content.
