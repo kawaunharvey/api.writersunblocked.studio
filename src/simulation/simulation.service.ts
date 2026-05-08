@@ -11,6 +11,8 @@ import { EventsService } from '../events/events.service'
 import { ThreadsService } from '../threads/threads.service'
 import { MomentumService } from './momentum.service'
 
+const OBJECT_ID_REGEX = /^[a-fA-F0-9]{24}$/;
+
 @Injectable()
 export class SimulationService {
   private readonly redis: Redis;
@@ -30,6 +32,30 @@ export class SimulationService {
 
     const dreamThreadsFlag = input.includeDreamThreads ? 'dt1' : 'dt0';
     return `simulate:${input.storyId}:${input.highlightBlockId}:${questionHash}:${dreamThreadsFlag}`;
+  }
+
+  private resolveFocalEntityId(
+    focalEntityValue: unknown,
+    entities: Array<{ id: string; name: string }>,
+  ): string | null {
+    if (typeof focalEntityValue !== 'string') {
+      return null;
+    }
+
+    const normalized = focalEntityValue.trim();
+    if (!normalized) {
+      return null;
+    }
+
+    if (OBJECT_ID_REGEX.test(normalized)) {
+      return normalized;
+    }
+
+    const matchedEntity = entities.find(
+      (entity) => entity.name.trim().toLowerCase() === normalized.toLowerCase(),
+    );
+
+    return matchedEntity?.id ?? null;
   }
 
   constructor(
@@ -157,9 +183,10 @@ export class SimulationService {
     );
 
     // Step 3 — Thread fetch with weights
-    const focalEntityId = typeof sensoryPresent.focalEntityId === 'string'
-      ? sensoryPresent.focalEntityId
-      : null;
+    const focalEntityId = this.resolveFocalEntityId(
+      sensoryPresent.focalEntityId,
+      allCharacters,
+    );
     const scopedEntities = sensoryPresent.entitiesPresent.filter(
       (e): e is { entityId: string; entityName: string; weightMultiplier: number } =>
         typeof e.entityId === 'string' && e.entityId.trim().length > 0,

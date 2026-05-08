@@ -100,8 +100,8 @@ export class AnalysisEligibilityService {
     const policy = getTierPolicy(tier);
     const normalizedContent = normalizeBlockContentForHash(block.content);
 
-    // Paywall: auto-highlight is only available to active paid subscribers
-    if (subscription?.subscriptionStatus !== 'active') {
+    // Trial users should still get regular thread generation.
+    if (subscription?.subscriptionStatus !== 'active' && subscription?.subscriptionStatus !== 'trialing') {
       return { decision: 'skip', tier, reason: 'paid-only' };
     }
 
