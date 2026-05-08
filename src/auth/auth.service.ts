@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
+import type { PaidSubscriptionTier, SubscriptionStatus } from '@prisma/client'
 import { AppConfigService } from '../common/config/app-config.service'
 import { generateReferralCode } from '../common/utils/referral-code.util'
 import { PrismaService } from '../database/prisma.service'
@@ -10,6 +11,10 @@ interface GoogleUserData {
   email: string;
   name: string | null;
   image: string | null;
+}
+
+interface SignupContext {
+  referralCode?: string;
 }
 
 export type WaitlistRejectionReason =
@@ -29,10 +34,13 @@ export class AuthService {
     private readonly config: AppConfigService,
   ) {}
 
-  async upsertGoogleUser(data: GoogleUserData): Promise<{ user: any; isNew: boolean }> {
+  async upsertGoogleUser(
+    data: GoogleUserData,
+    context?: SignupContext,
+  ): Promise<{ user: any; isNew: boolean }> {
     const existing = await this.prisma.user.findUnique({
       where: { googleId: data.googleId },
-      include: { referral: true },
+      include: { referral: true, subscription: true },
     });
 
     if (existing) {
@@ -45,29 +53,97 @@ export class AuthService {
         where: { id: existing.id },
         data: { name: data.name, image: data.image },
       });
-      return { user, isNew: false };
+
+      return {
+        user: {
+          ...user,
+          subscriptionStatus: existing.subscription?.subscriptionStatus ?? null,
+        },
+        isNew: false,
+      };
     }
 
-    // New user — 7-day default trial
-    const trialDays = 7;
+    const referralTrialDays = context?.referralCode
+      ? await this.getTrialLengthDaysForReferralCode(context.referralCode)
+      : null;
+    // New users coming through referral use referral-configured trial length.
+    const trialDays = referralTrialDays ?? await this.getTrialLengthDaysForEmail(data.email);
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
+    const expiresAt = new Date(trialEndsAt);
 
-    const newUser = await this.prisma.user.create({
-      data: {
-        googleId: data.googleId,
-        email: data.email,
-        name: data.name,
-        image: data.image,
-        subscriptionStatus: 'trialing',
-        trialEndsAt,
-      },
+    const newUser = await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          googleId: data.googleId,
+          email: data.email,
+          name: data.name,
+          image: data.image,
+        },
+      });
+
+      await tx.userSubscription.create({
+        data: {
+          userId: createdUser.id,
+          tier: 'starter' as PaidSubscriptionTier,
+          subscriptionStatus: 'trialing' as SubscriptionStatus,
+          trialEndsAt,
+          expiresAt,
+          metadata: {
+            trialLengthDays: trialDays,
+            source: referralTrialDays ? 'referral' : 'waitlist',
+          },
+        },
+      });
+
+      return createdUser;
     });
 
     // Create Referral record for the new user
     await this.createReferralForUser(newUser.id);
 
-    return { user: newUser, isNew: true };
+    return {
+      user: {
+        ...newUser,
+        subscriptionStatus: 'trialing',
+      },
+      isNew: true,
+    };
+  }
+
+  private async getTrialLengthDaysForEmail(email: string): Promise<number> {
+    const waitlistEntry = await this.prisma.waitlist.findUnique({
+      where: { email: email.trim().toLowerCase() },
+      select: { trialLengthDays: true },
+    });
+
+    const rawTrialDays = waitlistEntry?.trialLengthDays;
+    if (typeof rawTrialDays !== 'number' || !Number.isFinite(rawTrialDays)) {
+      return 7;
+    }
+
+    const trialDays = Math.floor(rawTrialDays);
+    return trialDays > 0 ? trialDays : 7;
+  }
+
+  private async getTrialLengthDaysForReferralCode(referralCode: string): Promise<number | null> {
+    const normalizedCode = referralCode.trim().toUpperCase();
+    if (!normalizedCode) {
+      return null;
+    }
+
+    const referral = await this.prisma.referral.findUnique({
+      where: { referralCode: normalizedCode },
+      select: { trialLengthDays: true },
+    });
+
+    const rawTrialDays = referral?.trialLengthDays;
+    if (typeof rawTrialDays !== 'number' || !Number.isFinite(rawTrialDays)) {
+      return null;
+    }
+
+    const trialDays = Math.floor(rawTrialDays);
+    return trialDays > 0 ? trialDays : null;
   }
 
   private async createReferralForUser(userId: string): Promise<void> {
@@ -76,11 +152,11 @@ export class AuthService {
       return existing === null;
     });
     await this.prisma.referral.create({
-      data: { userId, referralCode: code },
+      data: { userId, referralCode: code, trialLengthDays: 30 },
     });
   }
 
-  private async validateAndApplyReferralCode(
+  async validateAndApplyReferralCode(
     referralCode: string,
   ): Promise<{ valid: boolean; referralId?: string }> {
     try {

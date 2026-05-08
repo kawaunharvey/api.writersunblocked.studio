@@ -20,7 +20,7 @@ function normalizeEmail(email: string): string {
 
 class WaitlistDto {
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsOptional()
   @IsString()
@@ -31,7 +31,7 @@ class WaitlistDto {
 class ConfirmWaitlistDto {
   @IsString()
   @MinLength(32)
-  token: string;
+  token!: string;
 }
 
 @Controller('waitlist')
@@ -185,20 +185,31 @@ export class WaitlistController {
 
     const referral = await this.prisma.referral.findUnique({
       where: { referralCode: normalizedCode },
-      include: { user: { select: { name: true, email: true } } },
+      select: {
+        trialLengthDays: true,
+        user: { select: { name: true, email: true } },
+      },
     });
+
+    console.log('Validating referral code:', normalizedCode, 'Found referral:', referral);
 
     if (!referral) {
       return { valid: false };
     }
 
+    const rawTrialDays = referral.trialLengthDays;
+    const trialDays =
+      typeof rawTrialDays === 'number' && Number.isFinite(rawTrialDays) && rawTrialDays > 0
+        ? Math.floor(rawTrialDays)
+        : 7;
+
     return {
       valid: true,
       referrerName: referral.user.name || referral.user.email.split('@')[0],
       offer: {
-        trialDays: 30,
-        planId: 'early_bird',
-        price: '$6/mo',
+        trialDays,
+        planId: 'starter',
+        price: '$10/mo',
       },
     };
   }

@@ -31,6 +31,27 @@
 $ yarn install
 ```
 
+## Local Redis cache (Docker)
+
+Run Redis for local development:
+
+```bash
+$ yarn redis:up
+```
+
+Use this local URL in your backend env:
+
+```bash
+REDIS_URL=redis://localhost:6379
+```
+
+Useful commands:
+
+```bash
+$ yarn redis:logs
+$ yarn redis:down
+```
+
 ## Compile and run the project
 
 ```bash

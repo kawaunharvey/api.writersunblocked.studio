@@ -37,13 +37,25 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const referralCode = typeof req.cookies?.referredBy === 'string' ? req.cookies.referredBy : undefined;
+    let hasValidReferralCode = false;
+
     const shouldBypassWaitlist = normalizedEmail.endsWith(INTERNAL_EMAIL_DOMAIN);
     if (!shouldBypassWaitlist) {
       const existing = await this.authService.findUserByGoogleId(profile.id);
       if (!existing) {
-        const access = await this.authService.checkNewUserWaitlistAccess(normalizedEmail);
-        if (!access.ok) {
-          return { waitlistRejection: access.reason };
+        // Check if user has a valid referral code (can bypass waitlist)
+        hasValidReferralCode =
+          typeof referralCode === 'string'
+            ? (await this.authService.validateAndApplyReferralCode(referralCode)).valid
+            : false;
+
+        // Only check waitlist if no valid referral code
+        if (!hasValidReferralCode) {
+          const access = await this.authService.checkNewUserWaitlistAccess(normalizedEmail);
+          if (!access.ok) {
+            return { waitlistRejection: access.reason };
+          }
         }
       }
     }
@@ -53,6 +65,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       email: normalizedEmail,
       name: profile.displayName ?? null,
       image: profile.photos?.[0]?.value ?? null,
+    }, {
+      referralCode: hasValidReferralCode ? referralCode : undefined,
     });
   }
 }

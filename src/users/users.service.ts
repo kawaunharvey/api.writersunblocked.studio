@@ -16,7 +16,22 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findById(id: string) {
-    return this.prisma.user.findUnique({ where: { id }, include: { subscription: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: { subscription: true },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      ...user,
+      subscriptionStatus: user.subscription?.subscriptionStatus ?? null,
+      trialEndsAt: user.subscription?.trialEndsAt ?? null,
+      currentPeriodEnd: user.subscription?.expiresAt ?? null,
+      subscriptionOfferId: user.subscription?.tier ?? null,
+    };
   }
 
   async isHandleTaken(handle: string): Promise<boolean> {
@@ -76,10 +91,10 @@ export class UsersService {
   async applyReferral(
     userId: string,
     code: string,
-  ): Promise<{ applied: boolean; trialEndsAt?: Date }> {
+  ): Promise<{ applied: boolean }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { referredByReferralId: true, trialEndsAt: true },
+      select: { referredByReferralId: true },
     });
 
     // Already used a referral
@@ -101,17 +116,9 @@ export class UsersService {
       return { applied: false };
     }
 
-    // Extend trial: max(existing trialEndsAt, now + 30 days)
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-    const trialEndsAt =
-      user.trialEndsAt && user.trialEndsAt > thirtyDaysFromNow
-        ? user.trialEndsAt
-        : thirtyDaysFromNow;
-
     await this.prisma.user.update({
       where: { id: userId },
-      data: { referredByReferralId: referral.id, trialEndsAt },
+      data: { referredByReferralId: referral.id },
     });
 
     await this.prisma.referral.update({
@@ -119,7 +126,7 @@ export class UsersService {
       data: { referralsCount: { increment: 1 } },
     });
 
-    return { applied: true, trialEndsAt };
+    return { applied: true };
   }
 
   async updateNotifications(userId: string, preferences: Record<string, any>) {
@@ -166,6 +173,11 @@ export class UsersService {
     }
 
     // Soft delete by anonymizing user
+    await this.prisma.userSubscription.updateMany({
+      where: { userId },
+      data: { subscriptionStatus: 'canceled' },
+    });
+
     return this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -173,7 +185,6 @@ export class UsersService {
         name: 'Deleted User',
         handle: null,
         googleId: null,
-        subscriptionStatus: 'canceled',
         notificationPreferences: null,
       },
     });

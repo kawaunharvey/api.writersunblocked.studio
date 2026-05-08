@@ -311,6 +311,7 @@ model StoryboardComment {
 model Referral {
   id                 String   @id @default(auto()) @map("_id") @db.ObjectId
   userId             String   @unique @db.ObjectId
+  trialLengthDays    Int      @default(30)
   referralCode       String   @unique
   referralsCount     Int      @default(0)
   paidReferralsCount Int      @default(0)
@@ -324,6 +325,7 @@ model Waitlist {
   id                         String    @id @default(auto()) @map("_id") @db.ObjectId
   email                      String    @unique
   approved                   Boolean   @default(false)
+  trialLengthDays            Int       @default(7)
   referralCode               String    @unique
   referredById               String?   @db.ObjectId
   referralsCount             Int       @default(0)
@@ -357,7 +359,7 @@ model UserSubscription {
   user               User                 @relation("UserSubscriber", fields: [userId], references: [id], onDelete: Cascade)
   userId             String               @unique @db.ObjectId
   stripeCustomerId   String?
-  subscriptionStatus SubscriptionStatus?
+  subscriptionStatus SubscriptionStatus   @default(trialing)
   tier               PaidSubscriptionTier
   metadata           Json? // for extensibility, e.g. recording referral source, promotion code, etc.
   expiresAt          DateTime

@@ -47,7 +47,7 @@ const FREE_OFFER: OfferConfig = {
     currency: 'usd',
     interval: 'month',
     badge: 'Free',
-    isActive: true,
+    isActive: false,
     includes: [
       '1 active story',
       'Basic editor plus passages',

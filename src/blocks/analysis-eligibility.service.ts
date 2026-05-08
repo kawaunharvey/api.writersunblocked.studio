@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../database/prisma.service'
 import {
     getTierPolicy,
-    resolveTierFromSubscription,
     type OfferTier,
 } from '../payments/offers'
 import { normalizeBlockContentForHash } from './block-content-hash'
@@ -79,8 +78,12 @@ export class AnalysisEligibilityService {
             userId: true,
             user: {
               select: {
-                subscriptionStatus: true,
-                subscriptionOfferId: true,
+                subscription: {
+                  select: {
+                    subscriptionStatus: true,
+                    tier: true,
+                  },
+                },
               },
             },
           },
@@ -92,12 +95,13 @@ export class AnalysisEligibilityService {
       throw new Error('Block ownership must be checked before eligibility evaluation');
     }
 
-    const tier = resolveTierFromSubscription(block.story.user);
+    const subscription = block.story.user.subscription;
+    const tier: OfferTier = subscription?.tier ?? 'free';
     const policy = getTierPolicy(tier);
     const normalizedContent = normalizeBlockContentForHash(block.content);
 
     // Paywall: auto-highlight is only available to active paid subscribers
-    if (block.story.user.subscriptionStatus !== 'active') {
+    if (subscription?.subscriptionStatus !== 'active') {
       return { decision: 'skip', tier, reason: 'paid-only' };
     }
 

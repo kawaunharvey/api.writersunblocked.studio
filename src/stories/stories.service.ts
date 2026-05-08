@@ -706,7 +706,17 @@ export class StoriesService {
   private async assertOwnership(storyId: string, userId: string) {
     const story = await this.prisma.story.findUnique({
       where: { id: storyId },
-      include: { user: { select: { subscriptionStatus: true } } },
+      include: {
+        user: {
+          select: {
+            subscription: {
+              select: {
+                subscriptionStatus: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!story) throw new NotFoundException('Story not found');
@@ -786,7 +796,7 @@ export class StoriesService {
       wordCount: story.wordCount,
       lastEditedAt: story.lastEditedAt,
       createdAt: story.createdAt,
-      subscriptionStatus: story.user.subscriptionStatus,
+      subscriptionStatus: story.user.subscription?.subscriptionStatus ?? null,
       content: combined.content,
       contentJSON: combined.contentJSON,
       passages,

@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
-import type { PaidSubscriptionTier } from '@prisma/client'
-import moment from 'moment'
+import type { PaidSubscriptionTier, SubscriptionStatus } from '@prisma/client'
 import Stripe from 'stripe'
 import { AppConfigService } from '../common/config/app-config.service'
 import { PrismaService } from '../database/prisma.service'
@@ -68,12 +67,12 @@ export class StripeService {
       line_items: [lineItem],
       metadata: {
         offerId: offer.id,
-        offerTier: offer.tier ?? 'free',
+        offerTier: offer.tier ?? 'starter',
       },
       subscription_data: {
         metadata: {
           offerId: offer.id,
-          offerTier: offer.tier ?? 'free',
+          offerTier: offer.tier ?? 'starter',
         },
       },
       success_url: successUrl,
@@ -110,15 +109,23 @@ export class StripeService {
       return
     }
 
-    const withReferral = null
-    let expiresAt: Date = moment().add(30, 'days').toDate() // Default trial end in 30 days
-    let trialEndsAt: Date = moment().add(7, 'days').toDate() // Default trial end in 7 days
-    if (withReferral) {
-      trialEndsAt = moment().add(30, 'days').toDate() // Extended trial end in 30 days if referred
-    }
-    if (user.subscriptionStatus === 'trialing') {
-      expiresAt = moment(trialEndsAt).add(30, 'days').toDate() // Subscription expires 30 days after trial end
-    }
+    const existingSubscription = await this.prisma.userSubscription.findUnique({
+      where: { userId: user.id },
+      select: {
+        subscriptionStatus: true,
+        trialEndsAt: true,
+        expiresAt: true,
+      },
+    })
+
+    const currentPeriodEndUnix = (subscription as { current_period_end?: number })
+      .current_period_end
+    const expiresAt = currentPeriodEndUnix
+      ? new Date(currentPeriodEndUnix * 1000)
+      : existingSubscription?.expiresAt ?? new Date()
+    const normalizedStatus =
+      (subscription.status as SubscriptionStatus) ?? 'active'
+    const previousStatus = existingSubscription?.subscriptionStatus ?? null
 
     await this.prisma.userSubscription.upsert({
       where: { userId: user.id },
@@ -127,51 +134,35 @@ export class StripeService {
           connect: { id: user.id },
         },
         tier: offer?.tier as PaidSubscriptionTier,
-        subscriptionStatus: subscription.status,
-        trialEndsAt,
+        subscriptionStatus: normalizedStatus,
+        trialEndsAt: existingSubscription?.trialEndsAt ?? null,
         expiresAt,
         stripeCustomerId: customerId,
+        metadata: {
+          offerId: offer.id,
+          stripeSubscriptionId: subscription.id,
+        },
       },
       update: {
-        subscriptionStatus: subscription.status,
+        subscriptionStatus: normalizedStatus,
         stripeCustomerId: customerId,
-        user: {
-          update: {
-            subscriptionOfferId: offer?.id ?? null,
-            subscriptionStatus: subscription.status,
-          }
-        },
         tier: offer?.tier as PaidSubscriptionTier,
         expiresAt,
+        metadata: {
+          offerId: offer.id,
+          stripeSubscriptionId: subscription.id,
+        },
       },
     })
 
-    // await this.prisma.user.update({
-    //   where: { id: user.id },
-    //   data: {
-    //     subscriptionStatus: subscription.status,
-    //     subscriptionOfferId:
-    //       typeof subscription.metadata?.offerId === 'string' &&
-    //       subscription.metadata.offerId.trim().length > 0
-    //         ? subscription.metadata.offerId.trim()
-    //         : null,
-    //     stripeSubscriptionId: subscription.id,
-    //     currentPeriodEnd: new Date(
-    //       (subscription as unknown as { current_period_end: number })
-    //         .current_period_end * 1000,
-    //     ),
-    //   },
-    // })
-
     this.logger.log(
-      `Subscription updated for user ${user.id}: ${subscription.status}`,
+      `Subscription updated for user ${user.id}: ${normalizedStatus}`,
     )
 
     // Handle referrer rewards: detect trialing → active transition
-    const previousStatus = subscription.previous_attributes?.status
     if (
       previousStatus === 'trialing' &&
-      subscription.status === 'active' &&
+      normalizedStatus === 'active' &&
       user.referredByReferralId
     ) {
       await this.handleReferrerReward(user)
@@ -242,13 +233,17 @@ export class StripeService {
       where: { stripeCustomerId: customerId },
     })
     if (!user) return
+    await this.prisma.userSubscription.updateMany({
+      where: { userId: user.id },
+      data: {
+        subscriptionStatus: 'canceled',
+      },
+    })
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        subscriptionStatus: 'canceled',
-        subscriptionOfferId: null,
         stripeSubscriptionId: null,
-        currentPeriodEnd: null,
       },
     })
   }

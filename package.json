@@ -21,7 +21,10 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "redis:up": "docker compose -f docker-compose.redis.yml up -d",
+    "redis:down": "docker compose -f docker-compose.redis.yml down",
+    "redis:logs": "docker compose -f docker-compose.redis.yml logs -f redis"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
