@@ -8,10 +8,10 @@
   "scripts": {
     "build": "nest build",
     "format": "biome format --write .",
-    "start": "nest start",
+    "start": "yarn prisma:push && nest start ",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "yarn prisma:push && node dist/main",
     "lint": "biome lint --write .",
     "check": "biome check .",
     "check:fix": "biome check --write .",
