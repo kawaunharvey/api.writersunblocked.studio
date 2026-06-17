@@ -1,7 +1,11 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.14/schema.json",
-  "organizeImports": {
-    "enabled": true
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   },
   "formatter": {
     "enabled": true,
@@ -18,7 +22,7 @@
         "noUnusedImports": "error"
       },
       "suspicious": {
-        "noConsoleLog": "error",
+        "noConsole": "error",
         "noExplicitAny": "warn"
       },
       "style": {
@@ -49,12 +53,13 @@
     }
   },
   "files": {
-    "ignore": [
-      "dist/**",
-      "node_modules/**",
-      ".next/**",
-      "build/**",
-      "coverage/**"
+    "includes": [
+      "**",
+      "!dist/**",
+      "!node_modules/**",
+      "!.next/**",
+      "!build/**",
+      "!coverage/**"
     ]
   }
 }

@@ -1,0 +1,78 @@
+{
+  "keyAttributes": [
+    {
+      "label": "Full name",
+      "type": "text",
+      "context": "The character's full name",
+      "assignedTo": ["person"]
+    },
+    {
+      "label": "Status",
+      "type": "text",
+      "context": "The person's status. e.g. alive, dead, missing, etc.",
+      "assignedTo": ["person"]
+    },
+    {
+      "label": "Age",
+      "type": "number",
+      "context": "The character's age",
+      "assignedTo": ["person"]
+    },
+    {
+      "label": "Hometown",
+      "type": "text",
+      "context": "The character's hometown. Where they were born, raised, or currently live. May be a city, town, village, or other geographic location.",
+      "assignedTo": ["person"]
+    }
+  ],
+  "highlights": [
+    {
+      "shortId": "amber",
+      "label": "Amber",
+      "color": "#FFC107",
+      "backgroundColor": "#FFC107"
+    },
+    {
+      "shortId": "sage",
+      "label": "Sage",
+      "color": "#4CAF50",
+      "backgroundColor": "#4CAF50"
+    },
+    {
+      "shortId": "dustyrose",
+      "label": "Dusty Rose",
+      "color": "#E91E63",
+      "backgroundColor": "#E91E63"
+    },
+    {
+      "shortId": "periwinkle",
+      "label": "Periwinkle",
+      "color": "#6A1B9A",
+      "backgroundColor": "#6A1B9A"
+    },
+    {
+      "shortId": "lavender",
+      "label": "Lavender",
+      "color": "#9C27B0",
+      "backgroundColor": "#9C27B0"
+    },
+    {
+      "shortId": "peach",
+      "label": "Peach",
+      "color": "#FF9800",
+      "backgroundColor": "#FF9800"
+    },
+    {
+      "shortId": "mist",
+      "label": "Mist",
+      "color": "#9E9E9E",
+      "backgroundColor": "#9E9E9E"
+    },
+    {
+      "shortId": "sand",
+      "label": "Sand",
+      "color": "#D3D3D3",
+      "backgroundColor": "#D3D3D3"
+    }
+  ]
+}

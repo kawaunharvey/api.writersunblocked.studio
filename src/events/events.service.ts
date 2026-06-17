@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../database/prisma.service';
-import { AppConfigService } from '../common/config/app-config.service';
-import type { EventGroup, EventType } from './event.constants';
+import { AppConfigService } from '@/common/config/app-config.service'
+import { PrismaService } from '@/database/prisma.service'
+import { Injectable, Logger } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
+import type { EventGroup, EventType } from './event.constants'
 
 export interface RecordEventInput {
   eventType: EventType;

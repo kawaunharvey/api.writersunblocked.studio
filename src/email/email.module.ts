@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { MailgunService } from './mailgun.service';
-import { AppConfigModule } from '../common/config/config.module';
+import { AppConfigModule } from '@/common/config/config.module'
+import { Module } from '@nestjs/common'
+import { MailgunService } from './mailgun.service'
 
 @Module({
   imports: [AppConfigModule],

@@ -8,284 +8,212 @@ datasource db {
 }
 
 model User {
-  id                      String    @id @default(auto()) @map("_id") @db.ObjectId
-  email                   String    @unique
+  id                      String         @id @default(auto()) @map("_id") @db.ObjectId
+  email                   String         @unique
   name                    String?
-  handle                  String?   @unique
+  handle                  String?        @unique
   image                   String?
-  googleId                String?   @unique
+  googleId                String?        @unique
   stripeCustomerId        String?
   subscriptionStatus      String?
   subscriptionOfferId     String?
   trialEndsAt             DateTime?
   currentPeriodEnd        DateTime?
   stripeSubscriptionId    String?
-  referredByReferralId    String?   @db.ObjectId
+  referredByReferralId    String?        @db.ObjectId
   notificationPreferences Json?
-  createdAt               DateTime  @default(now())
+  posts                   PlatformPost[] @relation("UserPosts")
+  createdAt               DateTime       @default(now())
 
-  subscription         UserSubscription?     @relation("UserSubscriber")
-  stories              Story[]
-  characters           Character[]
-  locations            Location[]
-  storyboardComments   StoryboardComment[]
-  referenceTerms       ReferenceTerm[]
-  referenceOccurrences ReferenceOccurrence[]
-  referral             Referral?             @relation("UserOwnReferral")
-  referredByReferral   Referral?             @relation("UserReferredBy", fields: [referredByReferralId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subscription       UserSubscription? @relation("UserSubscriber")
+  stories            Story[]           @relation("UserStories")
+  comments           Comment[]
+  referral           Referral?         @relation("UserOwnReferral")
+  referredByReferral Referral?         @relation("UserReferredBy", fields: [referredByReferralId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+type SceneSettings {
+  tense       String? @default("present")
+  pov         String? @default("first")
+  perspective String? @db.ObjectId
+}
+
+type StorySettings {
+  sceneDefaults SceneSettings
+  updatedAt     DateTime
+  metadata      Json?
 }
 
 model Story {
-  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId             String   @db.ObjectId
-  title              String   @default("Untitled")
-  mode               String   @default("novel")
+  id                 String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String         @db.ObjectId
+  title              String         @default("Untitled")
+  mode               String         @default("novel")
   penName            String?
-  onboardingComplete Boolean  @default(false)
-  wordCount          Int      @default(0)
-  lastEditedAt       DateTime @default(now())
-  createdAt          DateTime @default(now())
-
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  blocks               Block[]
-  passages             Passage[]
-  characters           Character[]
-  locations            Location[]
-  worldCanon           WorldCanon?
-  dreamThreads         DreamThread[]
-  storyboardNotes      StoryboardNote[]
-  storyboardComments   StoryboardComment[]
-  referenceTerms       ReferenceTerm[]
-  referenceOccurrences ReferenceOccurrence[]
-  simulations          SimulationRun[]
+  onboardingComplete Boolean        @default(false)
+  wordCount          Int            @default(0)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  lastEditedAt       DateTime?
+  user               User           @relation("UserStories", fields: [userId], references: [id], onDelete: Cascade)
+  settings           StorySettings?
+  scenes             Scene[]        @relation("StoryScenes")
+  mentions           Mention[]
+  mentioned          Mentioned[]    @relation("StoryMentionFrequency")
+  notes              Note[]
+  comments           Comment[]
+  attributes         Attribute[]    @relation("StoryAttributes")
+  highlights         Highlight[]    @relation("StoryHighlights")
 }
 
-model Block {
-  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
-  storyId             String    @db.ObjectId
-  passageId           String?   @db.ObjectId
-  type                String
-  content             String
-  contentJSON         Json
-  order               Float
-  status              String    @default("pending")
-  hash                String?
-  analyzedContentHash String?
-  analysisResult      Json?
-  lastAnalyzedAt      DateTime?
-  analysisSkipped     Boolean   @default(false)
-  analysisFailCount   Int       @default(0)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+model Scene {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  storyId         String        @db.ObjectId
+  shortId         String        @unique
+  activeVersionId String?
+  label           String?       @default("Untitled Scene")
+  order           Float
+  summary         String?
+  settings        SceneSettings
+  visible         Boolean       @default(true)
+  color           String?       @default("amber")
+  threadCount     Int           @default(0)
+  mentionCount    Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime?     @updatedAt
+  lastAnalyzedAt  DateTime?
+  groupId         String?       @db.ObjectId
 
-  story                Story                 @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  passage              Passage?              @relation(fields: [passageId], references: [id], onDelete: Cascade)
-  threads              Thread[]
-  storyboardComments   StoryboardComment[]
-  referenceOccurrences ReferenceOccurrence[]
+  versions  SceneVersion[] @relation("SceneVersion")
+  mentioned Mentioned[]
+  notes     Note[]
 
-  @@index([storyId, order])
-  @@index([passageId, order])
-  @@index([storyId, analysisSkipped, lastAnalyzedAt])
-}
-
-model Passage {
-  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
-  storyId             String   @db.ObjectId
-  title               String   @default("Untitled Passage")
-  order               Float
-  visible             Boolean  @default(true)
-  wordCount           Int      @default(0)
-  threadCount         Int      @default(0)
-  characterCount      Int      @default(0)
-  locationCount       Int      @default(0)
-  chapters            Json[]   @default([])
-  identifyingChapters String[] @default([])
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  story   Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  blocks  Block[]
-  threads Thread[]
-  notes   PassageNote[]
+  group SceneGroup? @relation("SceneGroup", fields: [groupId], references: [id], onDelete: Cascade)
+  story Story       @relation("StoryScenes", fields: [storyId], references: [id], onDelete: Cascade)
 
   @@index([storyId, order])
   @@index([storyId, visible, order])
 }
 
-model PassageNote {
+model SceneVersion {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  passageId String   @db.ObjectId
-  content   String
+  sceneId   String   @db.ObjectId
+  shortId   String
+  data      Json?
+  label     String?  @default("Draft")
+  plainText String?
+  wordCount Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  passage Passage @relation(fields: [passageId], references: [id], onDelete: Cascade)
+  scene Scene @relation("SceneVersion", fields: [sceneId], references: [id], onDelete: Cascade)
 
-  @@index([passageId, createdAt])
+  @@index([sceneId, createdAt])
 }
 
-model ReferenceTerm {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  storyId        String   @db.ObjectId
-  userId         String   @db.ObjectId
-  entityId       String   @db.ObjectId
-  entityType     String
-  text           String
-  normalizedText String
-  color          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  story       Story                 @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  occurrences ReferenceOccurrence[]
-
-  @@unique([storyId, entityId, entityType, normalizedText])
-  @@index([storyId, entityType, normalizedText])
-}
-
-model ReferenceOccurrence {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  storyId    String   @db.ObjectId
-  blockId    String   @db.ObjectId
-  userId     String   @db.ObjectId
-  termId     String   @db.ObjectId
-  entityId   String   @db.ObjectId
-  entityType String
-  text       String
-  color      String?
-  source     String   @default("inferred")
-  confidence Float    @default(0.5)
-  createdAt  DateTime @default(now())
-
-  story Story         @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  block Block         @relation(fields: [blockId], references: [id], onDelete: Cascade)
-  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  term  ReferenceTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
-
-  @@unique([blockId, termId])
-  @@index([storyId, entityType, entityId])
-  @@index([blockId])
-}
-
-model Character {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  storyId        String   @db.ObjectId
-  userId         String   @db.ObjectId
-  name           String
-  initials       String
-  color          String
-  seedPrompt     String   @default("")
-  weight         Int      @default(5)
-  superObjective String   @default("")
-  coreFear       String   @default("")
-  customTags     Json[]   @default([])
-  mentionCount   Int      @default(0)
-  aliases        Json[]   @default([])
-  createdAt      DateTime @default(now())
-
-  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Location {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  storyId      String   @db.ObjectId
-  userId       String   @db.ObjectId
-  name         String
-  color        String   @default("teal")
-  description  String   @default("")
-  mentionCount Int      @default(0)
-  createdAt    DateTime @default(now())
-
-  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Thread {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  blockId       String   @db.ObjectId
-  storyId       String   @db.ObjectId
-  passageId     String?  @db.ObjectId
-  entityId      String   @db.ObjectId
-  entityType    String
-  blockOrder    Float
-  observation   String
-  interactions  String[]
-  emotionalTone String?
-  superObjAlign String?
-  createdAt     DateTime @default(now())
-
-  block   Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
-  passage Passage? @relation(fields: [passageId], references: [id], onDelete: Cascade)
-
-  @@unique([blockId, entityId])
-  @@index([storyId, entityId, blockOrder])
-  @@index([blockId])
-  @@index([passageId])
-}
-
-model SimulationRun {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
-  storyId          String   @db.ObjectId
-  userId           String   @db.ObjectId
-  highlightBlockId String?  @db.ObjectId
-  question         String?
-  focalEntityId    String?  @db.ObjectId
-  blockRangeIds    String[]
-  sensoryPresent   Json
-  candidates       Json[]
-  surfaced         String[]
-  dreamThreadIds   String[] @default([]) @db.ObjectId
-  userAction       String?
-  promotedTier     String?
-  createdAt        DateTime @default(now())
-
-  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
-}
-
-model WorldCanon {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  storyId   String   @unique @db.ObjectId
-  rules     Json
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
-
-  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
-}
-
-model DreamThread {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  storyId        String   @db.ObjectId
-  type           String
-  body           String
-  sourceEntities String[] @db.ObjectId
-  version        Int      @default(1)
-  createdAt      DateTime @default(now())
-
-  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
-
-  @@index([storyId])
-}
-
-model StoryboardNote {
+model SceneGroup {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   storyId   String   @db.ObjectId
-  passageId String   @unique @db.ObjectId
+  shortId   String
+  label     String?  @default("Untitled Group")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  scenes Scene[] @relation("SceneGroup")
+
+  @@index([storyId, shortId])
+  @@index([storyId, label])
+}
+
+enum MentionType {
+  person
+  place
+  thing
+}
+
+model Mention {
+  id           String      @id @default(auto()) @map("_id") @db.ObjectId
+  storyId      String      @db.ObjectId
+  userId       String      @db.ObjectId
+  name         String
+  mentionType  MentionType
+  status       String      @default("pending")
+  color        String?
+  aliases      Json[]      @default([])
+  mentionCount Int         @default(0)
+  metadata     Json?
+  threadIds    String[]    @db.ObjectId
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  story      Story            @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  mentioned  Mentioned[]      @relation("MentionFrequency")
+  context    MentionContext[]
+  attributes Attribute[]      @relation("MentionAttributes")
+
+  @@index([storyId, mentionType, status])
+  @@index([storyId, mentionCount])
+}
+
+model Mentioned {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId        String   @db.ObjectId
+  sceneVersionId String?  @db.ObjectId
+  mentionId      String   @db.ObjectId
+  targetWord     String
+  context        String?
+  source         String   @default("explicit")
+  confidence     Float    @default(1.0)
+  createdAt      DateTime @default(now())
+
+  story   Story   @relation("StoryMentionFrequency", fields: [storyId], references: [id], onDelete: Cascade)
+  mention Mention @relation("MentionFrequency", fields: [mentionId], references: [id], onDelete: Cascade)
+  sceneId String? @db.ObjectId
+  scene   Scene?  @relation(fields: [sceneId], references: [id])
+
+  @@index([storyId, mentionId])
+  @@index([sceneVersionId])
+}
+
+model MentionContext {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  mentionId String   @db.ObjectId
+  query     String?
+  category  String?
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mention Mention @relation(fields: [mentionId], references: [id], onDelete: Cascade)
+
+  @@index([mentionId])
+}
+
+model Note {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId   String   @db.ObjectId
+  sceneId   String?  @db.ObjectId
   body      String
+  color     String   @default("amber")
+  status    String?  @default("pending")
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 
-  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  story Story  @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  scene Scene? @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@index([color, sceneId])
 }
 
-model StoryboardComment {
+model Comment {
   id               String    @id @default(auto()) @map("_id") @db.ObjectId
   storyId          String    @db.ObjectId
-  blockId          String    @db.ObjectId
+  sceneId          String?   @db.ObjectId
+  sceneVersionId   String?   @db.ObjectId
+  noteId           String?   @db.ObjectId
   userId           String    @db.ObjectId
   parentId         String?   @db.ObjectId
+  type             String?   @default("storyboard")
   body             String
   anchorOffset     Int?
   anchorLength     Int?
@@ -296,14 +224,13 @@ model StoryboardComment {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  story   Story               @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  block   Block               @relation(fields: [blockId], references: [id], onDelete: Cascade)
-  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent  StoryboardComment?  @relation("StoryboardCommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  replies StoryboardComment[] @relation("StoryboardCommentReplies")
+  story   Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies Comment[] @relation("CommentReplies")
 
   @@index([storyId, createdAt])
-  @@index([storyId, blockId, createdAt])
+  @@index([storyId, sceneId, createdAt])
   @@index([parentId, createdAt])
   @@index([storyId, resolvedAt, createdAt])
 }
@@ -404,4 +331,97 @@ model AppEvent {
   @@index([eventType, occurredAt])
   @@index([userId, occurredAt])
   @@index([storyId, occurredAt])
+}
+
+model Attribute {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId        String   @db.ObjectId
+  label          String
+  type           String   @default("text")
+  value          String
+  keyAttributeId String?  @db.ObjectId
+  mentionId      String   @db.ObjectId
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  keyAttribute KeyAttribute? @relation("KeyAttributes", fields: [keyAttributeId], references: [id])
+  mentions     Mention       @relation("MentionAttributes", references: [id], fields: [mentionId])
+  story        Story         @relation("StoryAttributes", fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@index([storyId, createdAt])
+  @@index([mentionId])
+  @@index([storyId, mentionId])
+}
+
+model KeyAttribute {
+  id           String      @id @default(auto()) @map("_id") @db.ObjectId
+  storyId      String      @db.ObjectId
+  label        String
+  context      String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  attributeIds String[]    @db.ObjectId
+  attributes   Attribute[] @relation("KeyAttributes")
+
+  @@index([storyId, attributeIds])
+}
+
+model Highlight {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  storyId         String   @db.ObjectId
+  label           String   @default("Untitled Highlight")
+  shortId         String   @default("amber")
+  backgroundColor String   @default("#FFC107")
+  color           String   @default("#000000")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  story Story @relation("StoryHighlights", fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@index([storyId, createdAt])
+  @@index([storyId, shortId])
+  @@index([storyId, label])
+}
+
+enum EntityType {
+  PLATFORM
+  NOTE
+  COMMENT
+}
+
+model PlatformPost {
+  id        String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String         @db.ObjectId
+  type      EntityType     @default(PLATFORM)
+  user      User           @relation("UserPosts", fields: [userId], references: [id], onDelete: Cascade)
+  items     PlatformItem[] @relation("PlatformPosts")
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+enum PlatformStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+type PlatformData {
+  label String
+  type  String @default("text")
+  value String
+}
+
+model PlatformItem {
+  id         String         @id @default(auto()) @map("_id") @db.ObjectId
+  data       PlatformData[]
+  body       String?
+  status     PlatformStatus @default(PENDING)
+  postId     String?        @db.ObjectId
+  post       PlatformPost?  @relation("PlatformPosts", fields: [postId], references: [id], onDelete: Cascade)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  approvedAt DateTime?
+  rejectedAt DateTime?
 }

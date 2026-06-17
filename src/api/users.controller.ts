@@ -1,9 +1,8 @@
-import { BadRequestException, Controller, Get, Headers, Query, UnauthorizedException } from '@nestjs/common';
-import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
-import { AppConfigService } from '../common/config/app-config.service';
-import { PrismaService } from '../database/prisma.service';
-import { Public } from '../auth/public.decorator';
-import { isValidHandle, normalizeHandle } from '../users/users.service';
+import { AppConfigService } from '@/common/config/app-config.service'
+import { PrismaService } from '@/database/prisma.service'
+import { isValidHandle, normalizeHandle } from '@/modules//users/users.service'
+import { Public } from '@/modules/auth/public.decorator'
+import { BadRequestException, Controller, Get, Headers, Query, UnauthorizedException } from '@nestjs/common'
 
 @Controller('users')
 export class InternalUsersController {

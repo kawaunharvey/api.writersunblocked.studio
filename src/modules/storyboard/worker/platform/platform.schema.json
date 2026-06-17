@@ -1,0 +1,39 @@
+{
+  "sourceNote": {
+    "text": "string",
+    "entityRefs": ["refId"]
+  },
+  "entities": [
+    {
+      "ref": "e1",
+      "name": "string",
+      "type": "person | place | thing",
+      "resolution": "new | existing | ambiguous",
+      "matchedMentionId": "string | null",
+      "matchReason": "string",
+      "keyDetailUpdates": [
+        {
+          "label": "string",
+          "value": "string | number | string[]",
+          "fieldType": "text | number | option",
+          "evidence": "string"
+        }
+      ]
+    }
+  ],
+  "proposedScenes": [
+    {
+      "summary": "string",
+      "entityRefs": ["e1"],
+      "trigger": "explicit | inferred",
+      "matchedSceneId": "string | null"
+    }
+  ],
+  "residualNotes": [
+    {
+      "text": "string",
+      "entityRefs": ["e1"],
+      "matchedNoteId": "string | null"
+    }
+  ]
+}

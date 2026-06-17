@@ -1,10 +1,10 @@
+import { AppConfigService } from '@/common/config/app-config.service'
+import { generateReferralCode } from '@/common/utils/referral-code.util'
+import { PrismaService } from '@/database/prisma.service'
+import { Public } from '@/modules/auth/public.decorator'
 import { BadRequestException, Body, ConflictException, Controller, Get, Header, Param, Post } from '@nestjs/common'
 import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator'
 import { createHash, randomBytes } from 'crypto'
-import { Public } from '../auth/public.decorator'
-import { AppConfigService } from '../common/config/app-config.service'
-import { generateReferralCode } from '../common/utils/referral-code.util'
-import { PrismaService } from '../database/prisma.service'
 import { MailgunService } from '../email/mailgun.service'
 
 const CONFIRMATION_TOKEN_BYTES = 32;
