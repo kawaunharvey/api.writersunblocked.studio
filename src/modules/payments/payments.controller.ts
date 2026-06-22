@@ -1,48 +1,72 @@
 import { PrismaService } from '@/database/prisma.service'
 import {
-    BadRequestException,
-    Body,
-    Controller,
-    Get,
-    Post,
-    Req,
-    UnauthorizedException,
+  BadRequestException,
+  Body,
+  Controller,
+  Post,
+  Req,
+  UnauthorizedException,
 } from '@nestjs/common'
-import { IsNotEmpty, IsString, IsUrl } from 'class-validator'
-import { Public } from '../auth/public.decorator'
-import type { OfferTier } from './offers'
-import { getOfferById, OFFERS } from './offers'
-import type { RecurringInterval } from './stripe.service'
+import { Type } from 'class-transformer'
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Min,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator'
+import type { CheckoutOffer, OfferTier, RecurringInterval } from './payments.types'
 import { StripeService } from './stripe.service'
 
-export interface Offer {
-  id: string;
-  tier: OfferTier;
-  priceId?: string;
-  name: string;
-  description: string;
-  price: string;
-  amountCents?: number;
-  currency?: string;
-  interval: RecurringInterval;
-  badge?: string;
-  isActive: boolean;
-  includes?: string[];
-  maxBlocksAnalyzed?: number | 'unlimited';
+class CheckoutOfferDto implements CheckoutOffer {
+  @IsString()
+  @IsNotEmpty()
+  id!: string
+
+  @IsIn(['free', 'starter', 'writer', 'pro'])
+  tier!: OfferTier
+
+  @IsString()
+  @IsNotEmpty()
+  name!: string
+
+  @IsString()
+  @IsNotEmpty()
+  description!: string
+
+  @IsIn(['day', 'week', 'month', 'year'])
+  interval!: RecurringInterval
+
+  @ValidateIf((offer: CheckoutOfferDto) => !offer.stripePriceId)
+  @IsInt()
+  @Min(1)
+  amountCents?: number
+
+  @IsOptional()
+  @IsString()
+  stripePriceId?: string
+
+  @IsOptional()
+  @IsString()
+  currency?: string
 }
 
 export class CreateCheckoutSessionDto {
-  @IsString()
-  @IsNotEmpty()
-  offerId!: string;
+  @ValidateNested()
+  @Type(() => CheckoutOfferDto)
+  offer!: CheckoutOfferDto
 
   @IsString()
   @IsUrl({ require_tld: false, require_protocol: true })
-  successUrl!: string;
+  successUrl!: string
 
   @IsString()
   @IsUrl({ require_tld: false, require_protocol: true })
-  cancelUrl!: string;
+  cancelUrl!: string
 }
 
 @Controller('payments')
@@ -52,54 +76,35 @@ export class PaymentsController {
     private readonly prisma: PrismaService,
   ) {}
 
-  private getActiveOffers(): Offer[] {
-    return OFFERS.filter((offer) => offer.isActive);
-  }
-
-  @Public()
-  @Get('offers')
-  getOffers(): Offer[] {
-    return this.getActiveOffers();
-  }
-
   @Post('checkout-session')
   async createCheckoutSession(
     @Req() req: any,
     @Body() dto: CreateCheckoutSessionDto,
   ): Promise<{ url: string }> {
-    const { userId } = req.user as { userId: string };
+    const { userId } = req.user as { userId: string }
 
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId } })
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException('User not found')
     }
 
-    let customerId = user.stripeCustomerId;
+    const offer = dto.offer
+    if (!offer.stripePriceId && (!offer.amountCents || offer.amountCents < 1)) {
+      throw new BadRequestException(
+        'Offer must provide either stripePriceId or amountCents',
+      )
+    }
+
+    let customerId = user.stripeCustomerId
     if (!customerId) {
       customerId = await this.stripeService.createCustomer(
         user.email,
         user.name,
-      );
+      )
       await this.prisma.user.update({
         where: { id: userId },
         data: { stripeCustomerId: customerId },
-      });
-    }
-
-    const normalizedOfferId = (dto.offerId ?? '').trim();
-    const activeOffers = this.getActiveOffers();
-    const offer = getOfferById(normalizedOfferId);
-    if (!offer) {
-      throw new BadRequestException({
-        message: 'Invalid offerId',
-        receivedOfferId: normalizedOfferId,
-        availableOfferIds: activeOffers.map((item) => item.id),
-      });
-    }
-    if (!offer.priceId && (!offer.amountCents || offer.amountCents < 1)) {
-      throw new BadRequestException(
-        'Offer must provide either priceId or amountCents',
-      );
+      })
     }
 
     const url = await this.stripeService.createCheckoutSession(
@@ -107,8 +112,8 @@ export class PaymentsController {
       offer,
       dto.successUrl,
       dto.cancelUrl,
-    );
+    )
 
-    return { url };
+    return { url }
   }
 }

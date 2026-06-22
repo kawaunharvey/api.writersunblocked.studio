@@ -37,6 +37,14 @@ export class MailgunService {
     );
   }
 
+  async sendVerificationCode(to: string, code: string) {
+    await this.send(
+      to,
+      'Your Writers Unblocked verification code',
+      `<p>Your verification code is:</p><p style="font-size:24px;font-weight:700;letter-spacing:0.2em;">${code}</p><p>This code expires in 10 minutes.</p>`,
+    );
+  }
+
   async sendWaitlistWelcome(to: string, confirmationLink: string) {
     await this.send(
       to,

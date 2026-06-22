@@ -15,6 +15,9 @@ const envSchema = z.object({
   JWT_EXPIRY: z.string().default('7d'),
   AUTH_COOKIE_DOMAIN: z.string().optional(),
   INTERNAL_API_SECRET: z.string().min(1).default('change-me'),
+  SITE_API_KEY: z.string().min(1).default('change-me'),
+  ALLOWED_CORS_ORIGINS: z.string().optional(),
+  MARKETING_SITE_ORIGIN: z.string().url().optional(),
 
   // AI
   AI_PROVIDER: z.enum(['anthropic', 'openai']).default('anthropic'),
@@ -37,6 +40,13 @@ const envSchema = z.object({
   MAX_CONCURRENT_JOBS_PER_STORY: z.coerce.number().int().positive().default(3),
   MAX_CONCURRENT_AI_CALLS: z.coerce.number().int().positive().default(20),
   EVENT_RETENTION_DAYS: z.coerce.number().int().positive().default(60),
+
+  // Editor analysis
+  LANGUAGETOOL_URL: z.string().url().default('http://localhost:8010/v2/check'),
+  COPY_EDITOR_AI_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
 });
 
 export type EnvVars = z.infer<typeof envSchema>;

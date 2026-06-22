@@ -35,12 +35,12 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: config.nextJsOrigin,
+    origin: config.allowedCorsOrigins,
     credentials: true,
   });
 
   await app.listen(config.port);
   logger.log(`Nest API listening on port ${config.port}`, 'Bootstrap');
-  logger.log(`CORS origin set to ${config.nextJsOrigin}`, 'Bootstrap');
+  logger.log(`CORS origins: ${config.allowedCorsOrigins.join(', ')}`, 'Bootstrap');
 }
 bootstrap();

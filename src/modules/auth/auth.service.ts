@@ -13,6 +13,10 @@ interface GoogleUserData {
   image: string | null;
 }
 
+interface EmailUserData {
+  email: string;
+}
+
 interface SignupContext {
   referralCode?: string;
 }
@@ -109,6 +113,88 @@ export class AuthService {
       },
       isNew: true,
     };
+  }
+
+  async upsertEmailUser(
+    data: EmailUserData,
+    context?: SignupContext,
+  ): Promise<{ user: any; isNew: boolean }> {
+    const normalizedEmail = data.email.trim().toLowerCase();
+    const existing = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: { referral: true, subscription: true },
+    });
+
+    if (existing) {
+      if (!existing.referral) {
+        await this.createReferralForUser(existing.id);
+      }
+
+      return {
+        user: {
+          ...existing,
+          subscriptionStatus: existing.subscription?.subscriptionStatus ?? null,
+        },
+        isNew: false,
+      };
+    }
+
+    const referralCode = context?.referralCode?.trim().toUpperCase();
+    if (!referralCode) {
+      throw new Error('referral_required');
+    }
+
+    const referralValidation = await this.validateAndApplyReferralCode(referralCode);
+    if (!referralValidation.valid) {
+      throw new Error('invalid_referral');
+    }
+
+    const referralTrialDays = await this.getTrialLengthDaysForReferralCode(referralCode);
+    const trialDays = referralTrialDays ?? 7;
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
+    const expiresAt = new Date(trialEndsAt);
+
+    const newUser = await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+        },
+      });
+
+      await tx.userSubscription.create({
+        data: {
+          userId: createdUser.id,
+          tier: 'starter' as PaidSubscriptionTier,
+          subscriptionStatus: 'trialing' as SubscriptionStatus,
+          trialEndsAt,
+          expiresAt,
+          metadata: {
+            trialLengthDays: trialDays,
+            source: 'referral',
+          },
+        },
+      });
+
+      return createdUser;
+    });
+
+    await this.createReferralForUser(newUser.id);
+
+    return {
+      user: {
+        ...newUser,
+        subscriptionStatus: 'trialing',
+      },
+      isNew: true,
+    };
+  }
+
+  async findUserByEmail(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email: email.trim().toLowerCase() },
+      include: { subscription: true },
+    });
   }
 
   private async getTrialLengthDaysForEmail(email: string): Promise<number> {

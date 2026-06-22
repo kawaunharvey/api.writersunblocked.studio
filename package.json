@@ -24,7 +24,10 @@
     "prisma:push": "prisma db push",
     "redis:up": "docker compose -f docker-compose.redis.yml up -d",
     "redis:down": "docker compose -f docker-compose.redis.yml down",
-    "redis:logs": "docker compose -f docker-compose.redis.yml logs -f redis"
+    "redis:logs": "docker compose -f docker-compose.redis.yml logs -f redis",
+    "dev:services": "docker compose -f docker-compose.redis.yml -f docker-compose.dev.yml up -d",
+    "dev:services:down": "docker compose -f docker-compose.redis.yml -f docker-compose.dev.yml down",
+    "dev:services:logs": "docker compose -f docker-compose.redis.yml -f docker-compose.dev.yml logs -f"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",

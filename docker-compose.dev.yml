@@ -1,0 +1,10 @@
+services:
+  languagetool:
+    image: erikvl87/languagetool:latest
+    container_name: writersunblocked-languagetool
+    restart: unless-stopped
+    ports:
+      - "8010:8010"
+    environment:
+      - Java_Xms=512m
+      - Java_Xmx=1g

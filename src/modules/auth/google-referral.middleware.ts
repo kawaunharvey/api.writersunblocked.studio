@@ -25,6 +25,11 @@ export class GoogleReferralMiddleware implements NestMiddleware {
       res.cookie('oauth_mode', mode, cookieOptions);
     }
 
+    const returnTo = req.query?.returnTo;
+    if (typeof returnTo === 'string' && returnTo.length > 0) {
+      res.cookie('oauth_return_to', returnTo, cookieOptions);
+    }
+
     next();
   }
 }

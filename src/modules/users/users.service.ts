@@ -82,7 +82,7 @@ export class UsersService {
 
     return {
       isEligible: true,
-      referralLink: `${process.env.NEXT_JS_ORIGIN || 'https://writersunblocked.studio'}/invite/${referral.referralCode}`,
+      referralLink: `${process.env.MARKETING_SITE_ORIGIN || process.env.NEXTJS_ORIGIN || 'https://writersunblocked.studio'}/friends/${referral.referralCode}`,
       paidReferralsCount,
       freeMonthsEarned,
     };

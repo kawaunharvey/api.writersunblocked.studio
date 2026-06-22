@@ -3,20 +3,11 @@ import { PrismaService } from '@/database/prisma.service'
 import { Injectable, Logger } from '@nestjs/common'
 import type { PaidSubscriptionTier, SubscriptionStatus } from '@prisma/client'
 import Stripe from 'stripe'
-import { getOfferById } from './offers'
+import type { CheckoutOffer } from './payments.types'
 
 export type RecurringInterval = 'day' | 'week' | 'month' | 'year'
 
-export interface CheckoutOfferPricing {
-  id: string
-  tier?: string
-  name: string
-  description: string
-  interval: RecurringInterval
-  priceId?: string
-  amountCents?: number
-  currency?: string
-}
+export interface CheckoutOfferPricing extends CheckoutOffer {}
 
 @Injectable()
 export class StripeService {
@@ -46,8 +37,8 @@ export class StripeService {
     successUrl: string,
     cancelUrl: string,
   ): Promise<string> {
-    const lineItem = offer.priceId
-      ? { price: offer.priceId, quantity: 1 }
+    const lineItem = offer.stripePriceId
+      ? { price: offer.stripePriceId, quantity: 1 }
       : {
           price_data: {
             currency: offer.currency ?? 'usd',
@@ -67,12 +58,12 @@ export class StripeService {
       line_items: [lineItem],
       metadata: {
         offerId: offer.id,
-        offerTier: offer.tier ?? 'starter',
+        offerTier: offer.tier,
       },
       subscription_data: {
         metadata: {
           offerId: offer.id,
-          offerTier: offer.tier ?? 'starter',
+          offerTier: offer.tier,
         },
       },
       success_url: successUrl,
@@ -100,11 +91,12 @@ export class StripeService {
       return
     }
 
-    const offer = getOfferById(subscription.metadata?.offerId)
+    const offerId = subscription.metadata?.offerId as string | undefined
+    const offerTier = subscription.metadata?.offerTier as PaidSubscriptionTier | undefined
 
-    if (!offer) {
+    if (!offerTier) {
       this.logger.warn(
-        `No offer config found for offer ID ${subscription.metadata?.offerId}`,
+        `No offer tier found in subscription metadata for customer ${customerId}`,
       )
       return
     }
@@ -133,23 +125,23 @@ export class StripeService {
         user: {
           connect: { id: user.id },
         },
-        tier: offer?.tier as PaidSubscriptionTier,
+        tier: offerTier,
         subscriptionStatus: normalizedStatus,
         trialEndsAt: existingSubscription?.trialEndsAt ?? null,
         expiresAt,
         stripeCustomerId: customerId,
         metadata: {
-          offerId: offer.id,
+          offerId: offerId ?? null,
           stripeSubscriptionId: subscription.id,
         },
       },
       update: {
         subscriptionStatus: normalizedStatus,
         stripeCustomerId: customerId,
-        tier: offer?.tier as PaidSubscriptionTier,
+        tier: offerTier,
         expiresAt,
         metadata: {
-          offerId: offer.id,
+          offerId: offerId ?? null,
           stripeSubscriptionId: subscription.id,
         },
       },

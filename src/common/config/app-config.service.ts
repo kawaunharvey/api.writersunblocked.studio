@@ -67,6 +67,22 @@ export class AppConfigService {
     return this.configService.get('INTERNAL_API_SECRET', { infer: true });
   }
 
+  get siteApiKey(): string {
+    return this.configService.get('SITE_API_KEY', { infer: true });
+  }
+
+  get allowedCorsOrigins(): string[] {
+    const raw = this.configService.get('ALLOWED_CORS_ORIGINS', { infer: true });
+    if (raw) {
+      return raw.split(',').map((origin) => origin.trim()).filter(Boolean);
+    }
+    return [this.nextJsOrigin];
+  }
+
+  get marketingSiteOrigin(): string | undefined {
+    return this.configService.get('MARKETING_SITE_ORIGIN', { infer: true });
+  }
+
   // Payments
   get stripeSecretKey(): string {
     return this.configService.get('STRIPE_SECRET_KEY', { infer: true });
@@ -112,5 +128,13 @@ export class AppConfigService {
 
   get eventRetentionDays(): number {
     return this.configService.get('EVENT_RETENTION_DAYS', { infer: true });
+  }
+
+  get languageToolUrl(): string {
+    return this.configService.get('LANGUAGETOOL_URL', { infer: true });
+  }
+
+  get copyEditorAiEnabled(): boolean {
+    return this.configService.get('COPY_EDITOR_AI_ENABLED', { infer: true });
   }
 }

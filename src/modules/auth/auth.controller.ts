@@ -1,36 +1,66 @@
-import { AppConfigService } from "@/common/config/app-config.service";
+import { AppConfigService } from '@/common/config/app-config.service'
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   HttpCode,
   Post,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
-} from "@nestjs/common";
-import { AuthGuard } from "@nestjs/passport";
-import { AuthService } from "./auth.service";
-import { Public } from "./public.decorator";
+} from '@nestjs/common'
+import { AuthGuard } from '@nestjs/passport'
+import { IsEmail, IsOptional, IsString, Length } from 'class-validator'
+import { AuthService } from './auth.service'
+import { getAuthCookieDomain, getJwtCookieOptions } from './auth-cookie.util'
+import { EmailAuthService } from './email-auth.service'
+import { Public } from './public.decorator'
+import { SiteApiKeyGuard } from './site-api-key.guard'
 
 type WaitlistRejectionUser = { waitlistRejection: string };
 
-@Controller("auth")
+class SendEmailCodeDto {
+  @IsEmail()
+  email!: string;
+
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
+}
+
+class VerifyEmailCodeDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @Length(5, 5)
+  code!: string;
+
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
+}
+
+@Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly emailAuthService: EmailAuthService,
     private readonly config: AppConfigService,
   ) {}
 
   @Public()
-  @Get("google")
-  @UseGuards(AuthGuard("google"))
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
   googleAuth() {
     // Passport redirects to Google — referral code captured in GoogleStrategy
   }
 
   @Public()
-  @Get("google/callback")
-  @UseGuards(AuthGuard("google"))
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
   async googleCallback(@Req() req: any, @Res() res: any) {
     const user = req.user as
       | {
@@ -43,90 +73,144 @@ export class AuthController {
         }
       | WaitlistRejectionUser;
 
-    if ("waitlistRejection" in user) {
-      const redirectUrl = new URL(this.config.nextJsOrigin);
-      redirectUrl.searchParams.set("error", user.waitlistRejection);
+    if ('waitlistRejection' in user) {
+      const redirectUrl = new URL(this.getDefaultRedirectOrigin());
+      redirectUrl.searchParams.set('error', user.waitlistRejection);
       return res.redirect(redirectUrl.toString());
     }
 
     const { user: authUser, isNew } = user;
     const mode: string | undefined = req.cookies?.oauth_mode;
+    const returnTo: string | undefined = req.cookies?.oauth_return_to;
 
     const token = this.authService.issueJwt(authUser);
-    const isProduction = this.config.nodeEnv === "production";
-    const cookieDomain = this.getCookieDomain(isProduction);
+    const isProduction = this.config.nodeEnv === 'production';
+    const cookieDomain = getAuthCookieDomain(this.config, isProduction);
 
-    // Clear the short-lived OAuth mode cookie — it has done its job.
-    res.clearCookie("oauth_mode", {
+    res.clearCookie('oauth_mode', {
       httpOnly: true,
       secure: isProduction,
-      sameSite: "lax",
+      sameSite: 'lax',
+    });
+    res.clearCookie('oauth_return_to', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
     });
 
     if (cookieDomain) {
-      // Clear legacy host-only cookie so only one jwt cookie remains.
-      res.clearCookie("jwt", {
+      res.clearCookie('jwt', {
         httpOnly: true,
         secure: isProduction,
-        sameSite: isProduction ? "none" : "lax",
+        sameSite: isProduction ? 'none' : 'lax',
       });
     }
 
-    res.cookie("jwt", token, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? "none" : "lax",
-      ...(cookieDomain ? { domain: cookieDomain } : {}),
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    res.cookie('jwt', token, getJwtCookieOptions(this.config));
 
-    // Soft-block path mismatch: existing user on signup path → inform them
-    if (mode === "signup" && !isNew) {
-      return res.redirect(
-        `${this.config.nextJsOrigin}/?notice=existing_account`,
-      );
+    if (mode === 'signup' && !isNew) {
+      const redirectUrl = new URL(this.resolveRedirectUrl(returnTo));
+      redirectUrl.searchParams.set('notice', 'existing_account');
+      return res.redirect(redirectUrl.toString());
     }
 
-    res.redirect(`${this.config.nextJsOrigin}/`);
+    return res.redirect(this.resolveRedirectUrl(returnTo));
   }
 
-  @Post("logout")
+  @Public()
+  @UseGuards(SiteApiKeyGuard)
+  @Post('email/send-code')
+  @HttpCode(200)
+  async sendEmailCode(@Body() dto: SendEmailCodeDto) {
+    const result = await this.emailAuthService.sendCode(dto.email, dto.referralCode);
+    return { ok: true, codeLength: result.codeLength };
+  }
+
+  @Public()
+  @UseGuards(SiteApiKeyGuard)
+  @Post('email/verify')
+  @HttpCode(200)
+  async verifyEmailCode(@Body() dto: VerifyEmailCodeDto) {
+    const stored = await this.emailAuthService.verifyCode(dto.email, dto.code);
+    const referralCode = dto.referralCode ?? stored.referralCode;
+    const normalizedEmail = dto.email.trim().toLowerCase();
+    const existingUser = await this.authService.findUserByEmail(normalizedEmail);
+
+    try {
+      const { user, isNew } = existingUser
+        ? {
+            user: {
+              ...existingUser,
+              subscriptionStatus: existingUser.subscription?.subscriptionStatus ?? null,
+            },
+            isNew: false,
+          }
+        : await this.authService.upsertEmailUser(
+            { email: normalizedEmail },
+            { referralCode },
+          );
+
+      const token = this.authService.issueJwt(user);
+      return { token, isNew };
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === 'referral_required') {
+          throw new BadRequestException('A valid referral is required to create an account');
+        }
+        if (error.message === 'invalid_referral') {
+          throw new BadRequestException('Invalid referral code');
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  @Post('logout')
   @HttpCode(200)
   logout(@Res({ passthrough: true }) res: any) {
-    const isProduction = this.config.nodeEnv === "production";
-    const cookieDomain = this.getCookieDomain(isProduction);
+    const isProduction = this.config.nodeEnv === 'production';
+    const cookieDomain = getAuthCookieDomain(this.config, isProduction);
 
-    // Always clear host-only cookie in case it was set before domain sharing was enabled.
-    res.clearCookie("jwt", {
+    res.clearCookie('jwt', {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? "none" : "lax",
+      sameSite: isProduction ? 'none' : 'lax',
     });
 
-    res.clearCookie("jwt", {
+    res.clearCookie('jwt', {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? "none" : "lax",
+      sameSite: isProduction ? 'none' : 'lax',
       ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
     return { ok: true };
   }
 
-  private getCookieDomain(isProduction: boolean): string | undefined {
-    if (!isProduction) return undefined;
-    if (this.config.authCookieDomain) return this.config.authCookieDomain;
+  private getDefaultRedirectOrigin(): string {
+    return this.config.marketingSiteOrigin ?? this.config.nextJsOrigin;
+  }
+
+  private resolveRedirectUrl(returnTo?: string): string {
+    if (!returnTo) {
+      return `${this.getDefaultRedirectOrigin()}/signup/profile`;
+    }
 
     try {
-      const host = new URL(this.config.nextJsOrigin).hostname.toLowerCase();
-      if (host === "localhost" || host.endsWith(".localhost")) return undefined;
+      const url = new URL(returnTo);
+      const allowedOrigins = new Set([
+        ...this.config.allowedCorsOrigins,
+        this.config.nextJsOrigin,
+        ...(this.config.marketingSiteOrigin ? [this.config.marketingSiteOrigin] : []),
+      ]);
 
-      if (host.startsWith("www.")) {
-        return `.${host.slice(4)}`;
+      if (!allowedOrigins.has(url.origin)) {
+        throw new UnauthorizedException('Invalid return URL');
       }
 
-      return `.${host}`;
+      return url.toString();
     } catch {
-      return undefined;
+      return `${this.getDefaultRedirectOrigin()}/signup/profile`;
     }
   }
 }

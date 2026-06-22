@@ -19,6 +19,7 @@ import { DatabaseModule } from "./database/database.module";
 import { EmailModule } from "./email/email.module";
 import { EventsModule } from "./events/events.module";
 import { AiModule } from "./modules/ai/ai.module";
+import { EditorAnalysisModule } from "./modules/editor-analysis/editor-analysis.module";
 import { PlatformModule } from "./modules/platform/platform.module";
 import { StoriesModule } from "./modules/stories/stories.module";
 import { StoryboardModule } from "./modules/storyboard/storyboard.module";
@@ -152,6 +153,7 @@ type RequestWithIds = IncomingMessage & {
     StoriesModule,
     StoryboardModule,
     ScenesModule,
+    EditorAnalysisModule,
     PlatformModule,
     AiModule,
     PaymentsModule,
