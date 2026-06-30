@@ -8,7 +8,7 @@ import {
   Min,
 } from "class-validator";
 
-export const mentionTypes = ["person", "place", "thing"] as const;
+export const mentionTypes = ["person", "place", "thing", "group"] as const;
 export type MentionType = (typeof mentionTypes)[number];
 
 export const mentionStatuses = ["pending", "confirmed"] as const;
@@ -18,11 +18,13 @@ export class CreateMentionDto {
   @IsString()
   name!: string;
 
+  @IsOptional()
   @IsIn(mentionTypes)
-  mentionType!: MentionType;
+  mentionType?: MentionType;
 
+  @IsOptional()
   @IsIn(mentionStatuses)
-  status!: MentionStatus;
+  status?: MentionStatus;
 
   @IsOptional()
   @IsString()
@@ -53,10 +55,6 @@ export class UpdateMentionDto {
   @IsOptional()
   @IsString()
   color?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
 
   @IsOptional()
   @IsArray()

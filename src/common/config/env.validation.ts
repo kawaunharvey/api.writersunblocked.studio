@@ -17,7 +17,9 @@ const envSchema = z.object({
   INTERNAL_API_SECRET: z.string().min(1).default('change-me'),
   SITE_API_KEY: z.string().min(1).default('change-me'),
   ALLOWED_CORS_ORIGINS: z.string().optional(),
-  MARKETING_SITE_ORIGIN: z.string().url().optional(),
+  MARKETING_SITE_ORIGIN: z.string().url(),
+  APP_ORIGIN: z.string().url().optional(),
+  PAYLOAD_API_KEY: z.string().min(1),
 
   // AI
   AI_PROVIDER: z.enum(['anthropic', 'openai']).default('anthropic'),

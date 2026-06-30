@@ -47,27 +47,37 @@ export class LineEditorService {
       const raw = await this.provider.complete(userPrompt, LINE_EDITOR_SYSTEM_PROMPT);
       const parsed = extractJson(raw);
 
-      const suggestions: EditorSuggestionItem[] = parsed.suggestions
-        .filter(
-          (item) =>
-            item.charOffset >= 0 &&
-            item.charLength > 0 &&
-            item.charOffset + item.charLength <= plainText.length,
-        )
-        .map((item) => ({
-          id: randomUUID(),
-          editorMode: 'line' as const,
-          category: item.category,
-          severity: item.severity,
-          cardType: 'feedback' as const,
-          sceneId,
-          charOffset: item.charOffset,
-          charLength: item.charLength,
-          affectedText: plainText.slice(item.charOffset, item.charOffset + item.charLength),
-          message: item.message,
-          prompt: item.prompt,
-          platformHint: item.platformHint,
-        }));
+      const suggestions: EditorSuggestionItem[] = parsed.suggestions.flatMap((item) => {
+        const affectedText = item.affectedText?.trim();
+        if (!affectedText) {
+          return [];
+        }
+
+        const charOffset = plainText.indexOf(affectedText);
+        if (charOffset === -1) {
+          this.logger.warn(
+            `Line editor suggestion skipped: affectedText not found in scene ${sceneId}`,
+          );
+          return [];
+        }
+
+        return [
+          {
+            id: randomUUID(),
+            editorMode: 'line' as const,
+            category: item.category,
+            severity: item.severity,
+            cardType: 'feedback' as const,
+            sceneId,
+            charOffset,
+            charLength: affectedText.length,
+            affectedText,
+            message: item.message,
+            prompt: item.prompt,
+            platformHint: item.platformHint,
+          },
+        ];
+      });
 
       return {
         sceneId,

@@ -1,10 +1,9 @@
 import { AppConfigService } from '@/common/config/app-config.service'
+import { isInternalEmail } from '@/common/utils/internal-email.util'
 import { Injectable } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
 import { Profile, Strategy } from 'passport-google-oauth20'
 import { AuthService, type WaitlistRejectionReason } from './auth.service'
-
-const INTERNAL_EMAIL_DOMAIN = '@thehereafter.tech';
 
 type WaitlistRejectionUser = {
   waitlistRejection: WaitlistRejectionReason;
@@ -37,10 +36,30 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const googleUserData = {
+      googleId: profile.id,
+      email: normalizedEmail,
+      name: profile.displayName ?? null,
+      image: profile.photos?.[0]?.value ?? null,
+    };
+    const mode = req.cookies?.oauth_mode;
+
+    if (mode === 'login') {
+      try {
+        return await this.authService.authenticateGoogleUser(googleUserData);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'no_account') {
+          return { waitlistRejection: 'no_account' };
+        }
+
+        throw error;
+      }
+    }
+
     const referralCode = typeof req.cookies?.referredBy === 'string' ? req.cookies.referredBy : undefined;
     let hasValidReferralCode = false;
 
-    const shouldBypassWaitlist = normalizedEmail.endsWith(INTERNAL_EMAIL_DOMAIN);
+    const shouldBypassWaitlist = isInternalEmail(normalizedEmail);
     if (!shouldBypassWaitlist) {
       const existing = await this.authService.findUserByGoogleId(profile.id);
       if (!existing) {
@@ -60,12 +79,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       }
     }
 
-    return this.authService.upsertGoogleUser({
-      googleId: profile.id,
-      email: normalizedEmail,
-      name: profile.displayName ?? null,
-      image: profile.photos?.[0]?.value ?? null,
-    }, {
+    return this.authService.upsertGoogleUser(googleUserData, {
       referralCode: hasValidReferralCode ? referralCode : undefined,
     });
   }

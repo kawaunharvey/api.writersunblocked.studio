@@ -129,6 +129,7 @@ enum MentionType {
   person
   place
   thing
+  group
 }
 
 model Mention {

@@ -11,6 +11,11 @@ export function isValidHandle(handle: string): boolean {
   return HANDLE_REGEX.test(handle);
 }
 
+function generateRandomHandle(): string {
+  const suffix = Math.random().toString(36).slice(2, 10);
+  return `writer_${suffix}`.slice(0, 30);
+}
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -25,6 +30,26 @@ export class UsersService {
       return null;
     }
 
+    if (!user.handle?.trim()) {
+      await this.ensureHandle(id);
+      const refreshedUser = await this.prisma.user.findUnique({
+        where: { id },
+        include: { subscription: true },
+      });
+
+      if (!refreshedUser) {
+        return null;
+      }
+
+      return {
+        ...refreshedUser,
+        subscriptionStatus: refreshedUser.subscription?.subscriptionStatus ?? null,
+        trialEndsAt: refreshedUser.subscription?.trialEndsAt ?? null,
+        currentPeriodEnd: refreshedUser.subscription?.expiresAt ?? null,
+        subscriptionOfferId: refreshedUser.subscription?.tier ?? null,
+      };
+    }
+
     return {
       ...user,
       subscriptionStatus: user.subscription?.subscriptionStatus ?? null,
@@ -32,6 +57,32 @@ export class UsersService {
       currentPeriodEnd: user.subscription?.expiresAt ?? null,
       subscriptionOfferId: user.subscription?.tier ?? null,
     };
+  }
+
+  async ensureHandle(userId: string): Promise<string> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { handle: true },
+    });
+
+    if (user?.handle?.trim()) {
+      return user.handle;
+    }
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const handle = generateRandomHandle();
+      const taken = await this.isHandleTaken(handle);
+
+      if (!taken) {
+        const updated = await this.prisma.user.update({
+          where: { id: userId },
+          data: { handle },
+        });
+        return updated.handle!;
+      }
+    }
+
+    throw new Error('Unable to generate a unique handle');
   }
 
   async isHandleTaken(handle: string): Promise<boolean> {

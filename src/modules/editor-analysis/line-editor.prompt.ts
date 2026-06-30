@@ -15,8 +15,7 @@ Return valid JSON matching this schema:
     {
       "category": "voice-tone" | "rhythm-pacing" | "word-precision" | "show-tell" | "dialogue" | "redundancy" | "transition-flow",
       "severity": "error" | "warning" | "info",
-      "charOffset": number,
-      "charLength": number,
+      "affectedText": string,
       "message": string,
       "prompt": string,
       "platformHint": { "entityRefs": string[], "sceneRef": string }
@@ -25,7 +24,9 @@ Return valid JSON matching this schema:
 }
 
 Rules:
-- charOffset and charLength refer to character positions in the plain text provided
+- affectedText must be an exact substring copied from the plain text provided
+- affectedText should be the shortest passage that clearly shows the issue, usually one sentence or phrase
+- Do not include line breaks inside affectedText unless the issue spans a hard line break
 - Return at most 8 suggestions, prioritizing the most impactful
 - prompt should be a concise question or suggestion for the writer
 - platformHint.entityRefs may name characters or entities mentioned in the passage

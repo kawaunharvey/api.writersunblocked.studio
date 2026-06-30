@@ -45,6 +45,22 @@ Use this local URL in your backend env:
 REDIS_URL=redis://localhost:6379
 ```
 
+## Offers sync (Payload CMS)
+
+The API caches pricing offers from the marketing site's Payload CMS global. Set these env vars:
+
+```bash
+MARKETING_SITE_ORIGIN=https://writersunblocked.studio
+PAYLOAD_API_KEY=<users API key from Payload admin>
+INTERNAL_API_SECRET=<shared secret with marketing site>
+```
+
+In Payload admin, enable API keys on a CMS user (Users collection → generate API key) and use that value for `PAYLOAD_API_KEY`. When Pricing is saved in Payload, the marketing site calls `POST /payments/offers/sync` to refresh the cache. Offers and Features collections trigger the same sync on save. The app reads cached offers via:
+
+- `GET /payments/offers` — regular checkout variants
+- `GET /payments/special-offers` — promotional offers linked to regular plans
+- `GET /payments/custom-offers` — VIP/in-team offers (app only)
+
 Useful commands:
 
 ```bash

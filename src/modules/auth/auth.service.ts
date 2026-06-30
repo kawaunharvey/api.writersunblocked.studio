@@ -1,4 +1,5 @@
 import { AppConfigService } from '@/common/config/app-config.service'
+import { isInternalEmail } from '@/common/utils/internal-email.util'
 import { generateReferralCode } from '@/common/utils/referral-code.util'
 import { PrismaService } from '@/database/prisma.service'
 import { Injectable } from '@nestjs/common'
@@ -24,7 +25,8 @@ interface SignupContext {
 export type WaitlistRejectionReason =
   | 'not_on_waitlist'
   | 'not_confirmed'
-  | 'pending_approval';
+  | 'pending_approval'
+  | 'no_account';
 
 export type WaitlistAccessResult =
   | { ok: true }
@@ -115,6 +117,48 @@ export class AuthService {
     };
   }
 
+  async authenticateGoogleUser(
+    data: GoogleUserData,
+  ): Promise<{ user: any; isNew: false }> {
+    const normalizedEmail = data.email.trim().toLowerCase();
+    const existingByGoogleId = await this.prisma.user.findUnique({
+      where: { googleId: data.googleId },
+      include: { referral: true, subscription: true },
+    });
+
+    const existing =
+      existingByGoogleId ??
+      (await this.prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        include: { referral: true, subscription: true },
+      }));
+
+    if (!existing) {
+      throw new Error('no_account');
+    }
+
+    if (!existing.referral) {
+      await this.createReferralForUser(existing.id);
+    }
+
+    const user = await this.prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        googleId: data.googleId,
+        name: data.name ?? existing.name,
+        image: data.image ?? existing.image,
+      },
+    });
+
+    return {
+      user: {
+        ...user,
+        subscriptionStatus: existing.subscription?.subscriptionStatus ?? null,
+      },
+      isNew: false,
+    };
+  }
+
   async upsertEmailUser(
     data: EmailUserData,
     context?: SignupContext,
@@ -140,17 +184,25 @@ export class AuthService {
     }
 
     const referralCode = context?.referralCode?.trim().toUpperCase();
-    if (!referralCode) {
-      throw new Error('referral_required');
+    const internalEmail = isInternalEmail(normalizedEmail);
+
+    if (!internalEmail) {
+      if (!referralCode) {
+        throw new Error('referral_required');
+      }
+
+      const referralValidation = await this.validateAndApplyReferralCode(referralCode);
+      if (!referralValidation.valid) {
+        throw new Error('invalid_referral');
+      }
     }
 
-    const referralValidation = await this.validateAndApplyReferralCode(referralCode);
-    if (!referralValidation.valid) {
-      throw new Error('invalid_referral');
-    }
-
-    const referralTrialDays = await this.getTrialLengthDaysForReferralCode(referralCode);
-    const trialDays = referralTrialDays ?? 7;
+    const referralTrialDays = referralCode
+      ? await this.getTrialLengthDaysForReferralCode(referralCode)
+      : null;
+    const trialDays = referralTrialDays ?? (internalEmail
+      ? await this.getTrialLengthDaysForEmail(normalizedEmail)
+      : 7);
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
     const expiresAt = new Date(trialEndsAt);
@@ -171,7 +223,7 @@ export class AuthService {
           expiresAt,
           metadata: {
             trialLengthDays: trialDays,
-            source: 'referral',
+            source: referralCode ? 'referral' : 'internal',
           },
         },
       });

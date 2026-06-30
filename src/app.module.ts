@@ -1,5 +1,6 @@
 import { AuthModule } from "@/modules/auth/auth.module";
 import { JwtAuthGuard } from "@/modules/auth/jwt-auth.guard";
+import { OffersModule } from "@/modules/offers/offers.module";
 import { PaymentsModule } from "@/modules/payments/payments.module";
 import { ScenesModule } from "@/modules/scenes/scenes.module";
 import { SubscriptionsModule } from "@/modules/subscriptions/subscriptions.module";
@@ -157,6 +158,7 @@ type RequestWithIds = IncomingMessage & {
     PlatformModule,
     AiModule,
     PaymentsModule,
+    OffersModule,
     EmailModule,
     ApiModule,
     SubscriptionsModule,

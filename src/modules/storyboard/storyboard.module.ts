@@ -3,7 +3,7 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ProviderService } from "../ai/provider.service";
 import { CommentsService } from "./modules/comments/comments.service";
-import { MentionsService } from "./modules/mentions/mentions.service";
+import { MentionsModule } from "./modules/mentions/mentions.module";
 import { NotesService } from "./modules/notes/notes.service";
 import { StoryboardController } from "./storyboard.controller";
 import { StoryboardGateway } from "./storyboard.gateway";
@@ -23,13 +23,13 @@ import { StoryboardPlatformWorker } from "./worker/platform/platform.worker";
       { name: STORYBOARD_INTERROGATE_QUEUE },
     ),
     DatabaseModule,
+    MentionsModule,
   ],
   controllers: [StoryboardController],
   providers: [
     ProviderService,
     CommentsService,
     NotesService,
-    MentionsService,
     StoryboardService,
     StoryboardGateway,
     StoryboardOnboardingWorker,

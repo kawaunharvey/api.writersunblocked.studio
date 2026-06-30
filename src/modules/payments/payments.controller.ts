@@ -1,4 +1,5 @@
 import { PrismaService } from '@/database/prisma.service'
+import { OffersService } from '@/modules/offers/offers.service'
 import {
   BadRequestException,
   Body,
@@ -56,9 +57,15 @@ class CheckoutOfferDto implements CheckoutOffer {
 }
 
 export class CreateCheckoutSessionDto {
+  @ValidateIf((dto: CreateCheckoutSessionDto) => !dto.offerId)
   @ValidateNested()
   @Type(() => CheckoutOfferDto)
-  offer!: CheckoutOfferDto
+  offer?: CheckoutOfferDto
+
+  @ValidateIf((dto: CreateCheckoutSessionDto) => !dto.offer)
+  @IsString()
+  @IsNotEmpty()
+  offerId?: string
 
   @IsString()
   @IsUrl({ require_tld: false, require_protocol: true })
@@ -74,6 +81,7 @@ export class PaymentsController {
   constructor(
     private readonly stripeService: StripeService,
     private readonly prisma: PrismaService,
+    private readonly offersService: OffersService,
   ) {}
 
   @Post('checkout-session')
@@ -89,6 +97,14 @@ export class PaymentsController {
     }
 
     const offer = dto.offer
+      ?? (dto.offerId
+        ? await this.offersService.getCheckoutOffer(dto.offerId)
+        : null)
+
+    if (!offer) {
+      throw new BadRequestException('Either offer or offerId is required')
+    }
+
     if (!offer.stripePriceId && (!offer.amountCents || offer.amountCents < 1)) {
       throw new BadRequestException(
         'Offer must provide either stripePriceId or amountCents',

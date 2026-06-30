@@ -79,8 +79,19 @@ export class AppConfigService {
     return [this.nextJsOrigin];
   }
 
-  get marketingSiteOrigin(): string | undefined {
+  get marketingSiteOrigin(): string {
     return this.configService.get('MARKETING_SITE_ORIGIN', { infer: true });
+  }
+
+  get appOrigin(): string {
+    return (
+      this.configService.get('APP_ORIGIN', { infer: true }) ??
+      'https://app.writersunblocked.studio'
+    );
+  }
+
+  get payloadApiKey(): string {
+    return this.configService.get('PAYLOAD_API_KEY', { infer: true });
   }
 
   // Payments

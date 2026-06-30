@@ -73,19 +73,26 @@ export class AuthController {
         }
       | WaitlistRejectionUser;
 
+    const mode: string | undefined = req.cookies?.oauth_mode;
+    const returnTo: string | undefined = req.cookies?.oauth_return_to;
+    const isProduction = this.config.nodeEnv === 'production';
+    const cookieDomain = getAuthCookieDomain(this.config, isProduction);
+
     if ('waitlistRejection' in user) {
-      const redirectUrl = new URL(this.getDefaultRedirectOrigin());
+      const redirectUrl = new URL(this.getAuthErrorRedirectUrl(mode, returnTo));
       redirectUrl.searchParams.set('error', user.waitlistRejection);
       return res.redirect(redirectUrl.toString());
     }
 
     const { user: authUser, isNew } = user;
-    const mode: string | undefined = req.cookies?.oauth_mode;
-    const returnTo: string | undefined = req.cookies?.oauth_return_to;
+
+    if (mode === 'login' && isNew) {
+      const redirectUrl = new URL(this.getAuthErrorRedirectUrl(mode, returnTo));
+      redirectUrl.searchParams.set('error', 'no_account');
+      return res.redirect(redirectUrl.toString());
+    }
 
     const token = this.authService.issueJwt(authUser);
-    const isProduction = this.config.nodeEnv === 'production';
-    const cookieDomain = getAuthCookieDomain(this.config, isProduction);
 
     res.clearCookie('oauth_mode', {
       httpOnly: true,
@@ -109,12 +116,12 @@ export class AuthController {
     res.cookie('jwt', token, getJwtCookieOptions(this.config));
 
     if (mode === 'signup' && !isNew) {
-      const redirectUrl = new URL(this.resolveRedirectUrl(returnTo));
+      const redirectUrl = new URL(this.resolveRedirectUrl(returnTo, mode));
       redirectUrl.searchParams.set('notice', 'existing_account');
       return res.redirect(redirectUrl.toString());
     }
 
-    return res.redirect(this.resolveRedirectUrl(returnTo));
+    return res.redirect(this.resolveRedirectUrl(returnTo, mode));
   }
 
   @Public()
@@ -191,9 +198,37 @@ export class AuthController {
     return this.config.marketingSiteOrigin ?? this.config.nextJsOrigin;
   }
 
-  private resolveRedirectUrl(returnTo?: string): string {
+  private getAppLoginUrl(): string {
+    return `${this.config.appOrigin.replace(/\/$/, '')}/login`;
+  }
+
+  private getAuthErrorRedirectUrl(mode?: string, returnTo?: string): string {
+    if (mode === 'login') {
+      if (returnTo) {
+        try {
+          const url = new URL(returnTo);
+          const loginUrl = new URL(this.getAppLoginUrl());
+          if (url.origin === loginUrl.origin) {
+            return loginUrl.toString();
+          }
+        } catch {
+          // Fall through to the app login URL.
+        }
+      }
+
+      return this.getAppLoginUrl();
+    }
+
+    return this.getDefaultRedirectOrigin();
+  }
+
+  private resolveRedirectUrl(returnTo?: string, mode?: string): string {
+    const fallbackOrigin =
+      mode === 'login' ? this.config.appOrigin : this.getDefaultRedirectOrigin();
+    const fallbackPath = mode === 'login' ? '/' : '/signup/profile';
+
     if (!returnTo) {
-      return `${this.getDefaultRedirectOrigin()}/signup/profile`;
+      return `${fallbackOrigin.replace(/\/$/, '')}${fallbackPath}`;
     }
 
     try {
@@ -201,6 +236,7 @@ export class AuthController {
       const allowedOrigins = new Set([
         ...this.config.allowedCorsOrigins,
         this.config.nextJsOrigin,
+        this.config.appOrigin,
         ...(this.config.marketingSiteOrigin ? [this.config.marketingSiteOrigin] : []),
       ]);
 
@@ -209,8 +245,12 @@ export class AuthController {
       }
 
       return url.toString();
-    } catch {
-      return `${this.getDefaultRedirectOrigin()}/signup/profile`;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      return `${fallbackOrigin.replace(/\/$/, '')}${fallbackPath}`;
     }
   }
 }

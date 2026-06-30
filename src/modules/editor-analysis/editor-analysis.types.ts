@@ -71,8 +71,9 @@ export interface LanguageToolResponse {
 export interface LineEditorAiSuggestion {
   category: SuggestionCategory;
   severity: SuggestionSeverity;
-  charOffset: number;
-  charLength: number;
+  affectedText: string;
+  charOffset?: number;
+  charLength?: number;
   message: string;
   prompt?: string;
   platformHint?: {
