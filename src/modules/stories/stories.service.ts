@@ -1,4 +1,5 @@
 import { ProgressGateway } from "@/modules/gateway/progress.gateway";
+import { IntelligenceOrchestratorService } from "@/modules/story-intelligence/services/intelligence-orchestrator.service";
 import {
   ForbiddenException,
   Injectable,
@@ -45,6 +46,7 @@ export class StoriesService {
     private readonly prisma: PrismaService,
     private readonly scenesService: ScenesService,
     private readonly progressGateway: ProgressGateway,
+    private readonly intelligenceOrchestrator: IntelligenceOrchestratorService,
   ) {}
 
   private isRetryableTransactionError(error: unknown): boolean {
@@ -937,6 +939,20 @@ export class StoriesService {
         versionId: updated.activeVersionId,
         wordCount: activeVersion?.wordCount ?? dto.wordCount ?? 0,
       });
+
+      if (dto.content !== undefined && dto.content.trim()) {
+        void this.intelligenceOrchestrator
+          .recordAndEnqueue({
+            storyId,
+            userId,
+            source: 'editor_scene',
+            canonStatus: 'canon',
+            plainText: dto.content,
+            sceneId,
+            sceneVersionId: updated.activeVersionId,
+          })
+          .catch(() => undefined);
+      }
     }
 
     return updated;

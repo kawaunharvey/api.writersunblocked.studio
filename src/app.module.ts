@@ -22,6 +22,7 @@ import { EventsModule } from "./events/events.module";
 import { AiModule } from "./modules/ai/ai.module";
 import { EditorAnalysisModule } from "./modules/editor-analysis/editor-analysis.module";
 import { PlatformModule } from "./modules/platform/platform.module";
+import { StoryIntelligenceModule } from "./modules/story-intelligence/story-intelligence.module";
 import { StoriesModule } from "./modules/stories/stories.module";
 import { StoryboardModule } from "./modules/storyboard/storyboard.module";
 
@@ -152,6 +153,7 @@ type RequestWithIds = IncomingMessage & {
     AuthModule,
     UsersModule,
     StoriesModule,
+    StoryIntelligenceModule,
     StoryboardModule,
     ScenesModule,
     EditorAnalysisModule,

@@ -5,6 +5,7 @@ export const EVENT_GROUP = {
   BLOCK_ANALYSIS: 'block_analysis',
   COMMENTS: 'comments',
   SCENE_ANALYSIS: 'scene_analysis',
+  STORY_INTELLIGENCE: 'story_intelligence',
 } as const;
 
 export type EventGroup = (typeof EVENT_GROUP)[keyof typeof EVENT_GROUP];
@@ -38,6 +39,11 @@ export const EVENT_TYPE = {
   STORYBOARD_COMMENT_DELETED: 'storyboard.comment.deleted',
   STORYBOARD_COMMENT_RESOLVED: 'storyboard.comment.resolved',
   STORYBOARD_COMMENT_REOPENED: 'storyboard.comment.reopened',
+
+  // Story intelligence lifecycle
+  INTELLIGENCE_RUN_COMPLETED: 'intelligence.run.completed',
+  INTELLIGENCE_RUN_SKIPPED: 'intelligence.run.skipped',
+  INTELLIGENCE_RUN_FAILED: 'intelligence.run.failed',
 } as const;
 
 export type EventType = (typeof EVENT_TYPE)[keyof typeof EVENT_TYPE];

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ProviderService } from '../ai/provider.service';
+import type { StoryIntelligenceContext } from '../story-intelligence/story-intelligence.types';
 import type {
   EditorAnalysisResult,
   EditorSuggestionItem,
@@ -31,6 +32,7 @@ export class LineEditorService {
     sceneId: string,
     plainText: string,
     sceneLabel?: string,
+    storyContext?: StoryIntelligenceContext,
   ): Promise<EditorAnalysisResult> {
     if (!plainText.trim()) {
       return {
@@ -43,7 +45,7 @@ export class LineEditorService {
     }
 
     try {
-      const userPrompt = buildLineEditorUserPrompt(plainText, sceneLabel);
+      const userPrompt = buildLineEditorUserPrompt(plainText, sceneLabel, storyContext);
       const raw = await this.provider.complete(userPrompt, LINE_EDITOR_SYSTEM_PROMPT);
       const parsed = extractJson(raw);
 

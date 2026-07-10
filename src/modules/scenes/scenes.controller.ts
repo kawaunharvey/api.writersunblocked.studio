@@ -1,5 +1,6 @@
 
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req } from '@nestjs/common'
+import { IntelligenceOrchestratorService } from '@/modules/story-intelligence/services/intelligence-orchestrator.service'
 import {
   CreateSceneDto,
   CreateSceneNoteDto,
@@ -13,6 +14,7 @@ import { ScenesService } from './scenes.service'
 export class ScenesController {
   constructor(
     private readonly scenesService: ScenesService,
+    private readonly intelligenceOrchestrator: IntelligenceOrchestratorService,
   ) {}
 
   @Get('stories/:storyId/scenes')
@@ -101,7 +103,18 @@ export class ScenesController {
   @Post('scenes/:sceneId/analyze')
   async enqueueAnalysis(@Param('sceneId') sceneId: string, @Req() req: any) {
     const { userId } = req.user as { userId: string };
-    const scene = await this.scenesService.assertOwnership(sceneId, userId);
-    return { queued: true, sceneId };
+    await this.scenesService.assertOwnership(sceneId, userId);
+
+    const result = await this.intelligenceOrchestrator.enqueueSceneAnalysis(
+      sceneId,
+      userId,
+    );
+
+    return {
+      queued: result.queued,
+      sceneId,
+      reason: result.reason,
+      inputId: result.input.id,
+    };
   }
 }

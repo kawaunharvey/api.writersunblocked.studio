@@ -64,6 +64,7 @@ model Story {
   comments           Comment[]
   attributes         Attribute[]    @relation("StoryAttributes")
   highlights         Highlight[]    @relation("StoryHighlights")
+  platformPosts      PlatformPost[] @relation("StoryPlatformPosts")
 }
 
 model Scene {
@@ -390,16 +391,36 @@ enum EntityType {
   COMMENT
 }
 
+enum PlatformInputType {
+  input
+  note
+  comment
+  link
+}
+
+enum AppliedEntityType {
+  mention
+  scene
+  note
+}
+
 model PlatformPost {
-  id        String         @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String         @db.ObjectId
-  type      EntityType     @default(PLATFORM)
-  user      User           @relation("UserPosts", fields: [userId], references: [id], onDelete: Cascade)
-  items     PlatformItem[] @relation("PlatformPosts")
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id           String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String            @db.ObjectId
+  storyId      String            @db.ObjectId
+  type         EntityType        @default(PLATFORM)
+  platformType PlatformInputType @default(input)
+  body         String?
+  content      Json?
+  color        String?
+  user         User              @relation("UserPosts", fields: [userId], references: [id], onDelete: Cascade)
+  story        Story             @relation("StoryPlatformPosts", fields: [storyId], references: [id], onDelete: Cascade)
+  items        PlatformItem[]    @relation("PlatformPosts")
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   @@index([userId, createdAt])
+  @@index([storyId, createdAt])
 }
 
 enum PlatformStatus {
@@ -415,14 +436,123 @@ type PlatformData {
 }
 
 model PlatformItem {
-  id         String         @id @default(auto()) @map("_id") @db.ObjectId
-  data       PlatformData[]
-  body       String?
-  status     PlatformStatus @default(PENDING)
-  postId     String?        @db.ObjectId
-  post       PlatformPost?  @relation("PlatformPosts", fields: [postId], references: [id], onDelete: Cascade)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  approvedAt DateTime?
-  rejectedAt DateTime?
+  id                String             @id @default(auto()) @map("_id") @db.ObjectId
+  storyId           String             @db.ObjectId
+  action            String?
+  data              PlatformData[]
+  body              String?
+  status            PlatformStatus     @default(PENDING)
+  postId            String?            @db.ObjectId
+  post              PlatformPost?      @relation("PlatformPosts", fields: [postId], references: [id], onDelete: Cascade)
+  appliedEntityId   String?            @db.ObjectId
+  appliedEntityType AppliedEntityType?
+  rejectionReason   String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+
+  @@index([storyId, status])
+  @@index([postId])
+}
+
+enum StoryInputSource {
+  editor_scene
+  platform
+  line_feedback
+  note
+  comment
+}
+
+enum CanonStatus {
+  canon
+  intent
+}
+
+enum ThreadLayer {
+  character_arc
+  relationship
+  plot_line
+  subplot
+  beat
+  world_rule
+  tone
+}
+
+enum ThreadStatus {
+  open
+  advanced
+  resolved
+  contradicted
+}
+
+enum IntelligenceRunStatus {
+  queued
+  running
+  completed
+  skipped
+  failed
+}
+
+model StoryInput {
+  id             String           @id @default(auto()) @map("_id") @db.ObjectId
+  storyId        String           @db.ObjectId
+  userId         String           @db.ObjectId
+  source         StoryInputSource
+  canonStatus    CanonStatus
+  plainText      String?
+  contentHash    String
+  sceneId        String?          @db.ObjectId
+  sceneVersionId String?          @db.ObjectId
+  mentionId      String?          @db.ObjectId
+  noteId         String?          @db.ObjectId
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+
+  runs IntelligenceRun[]
+
+  @@index([storyId, createdAt])
+  @@index([storyId, source])
+  @@index([sceneId, contentHash])
+}
+
+model Thread {
+  id               String       @id @default(auto()) @map("_id") @db.ObjectId
+  storyId          String       @db.ObjectId
+  layer            ThreadLayer
+  status           ThreadStatus @default(open)
+  canonStatus      CanonStatus
+  confidence       Float        @default(0.8)
+  summary          String
+  body             Json
+  pecFlags         String[]     @default([])
+  sourceInputId    String?      @db.ObjectId
+  mentionIds       String[]     @db.ObjectId
+  sceneIds         String[]     @db.ObjectId
+  relatedThreadIds String[]     @db.ObjectId
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([storyId, layer, status])
+  @@index([storyId, canonStatus])
+}
+
+model IntelligenceRun {
+  id             String                @id @default(auto()) @map("_id") @db.ObjectId
+  storyId        String                @db.ObjectId
+  inputId        String                @db.ObjectId
+  jobType        String
+  status         IntelligenceRunStatus
+  sceneId        String?               @db.ObjectId
+  threadsCreated Int                   @default(0)
+  threadsUpdated Int                   @default(0)
+  diagnostic     String?
+  durationMs     Int?
+  createdAt      DateTime              @default(now())
+  completedAt    DateTime?
+
+  input StoryInput @relation(fields: [inputId], references: [id], onDelete: Cascade)
+
+  @@index([storyId, createdAt])
+  @@index([inputId])
 }

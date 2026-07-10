@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PlatformService } from '../platform/platform.service';
+import { IntelligenceContextService } from '../story-intelligence/services/intelligence-context.service';
 import { ScenesService } from '../scenes/scenes.service';
 import { CopyEditorService } from './copy-editor.service';
 import type { EditorAnalysisResult, LineEditorFeedbackResult } from './editor-analysis.types';
@@ -12,6 +13,7 @@ export class EditorAnalysisService {
     private readonly copyEditorService: CopyEditorService,
     private readonly lineEditorService: LineEditorService,
     private readonly platformService: PlatformService,
+    private readonly intelligenceContextService: IntelligenceContextService,
   ) {}
 
   async analyzeCopy(
@@ -31,7 +33,16 @@ export class EditorAnalysisService {
     plainText: string,
   ): Promise<EditorAnalysisResult> {
     const scene = await this.scenesService.assertOwnership(sceneId, userId);
-    return this.lineEditorService.analyze(sceneId, plainText, scene.label ?? undefined);
+    const storyContext = await this.intelligenceContextService.buildContext(
+      storyId,
+      sceneId,
+    );
+    return this.lineEditorService.analyze(
+      sceneId,
+      plainText,
+      scene.label ?? undefined,
+      storyContext,
+    );
   }
 
   async respondToLineSuggestion(
